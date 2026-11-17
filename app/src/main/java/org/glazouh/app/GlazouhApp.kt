@@ -1,11 +1,13 @@
 package org.glazouh.app
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.pm.PackageManager
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -55,7 +57,8 @@ private val GlazouhColors = darkColorScheme(
     error = Color(0xFFFF6B6B)
 )
 
-private enum class MainMode { HOME, READER, CAPTIONS }
+private enum class MainMode { HOME, READER, CAPTIONS, OBJECTS, DIARIZATION, SOUNDS }
+private enum class CaptionEngine { ANDROID_SYSTEM, SHERPA_T_ONE }
 
 @Composable
 fun GlazouhApp() {
@@ -67,7 +70,29 @@ fun GlazouhApp() {
     var isReading by remember { mutableStateOf(false) }
     var transcript by remember { mutableStateOf(emptyList<String>()) }
     var partialCaption by remember { mutableStateOf("") }
+    var captionLanguage by remember { mutableStateOf("ru-RU") }
+    var captionEngine by remember { mutableStateOf(CaptionEngine.ANDROID_SYSTEM) }
     var ttsReady by remember { mutableStateOf(false) }
+    var diarizationRecording by remember { mutableStateOf(false) }
+    var speakerSegments by remember { mutableStateOf(emptyList<SpeakerSegment>()) }
+    var soundMonitoring by remember { mutableStateOf(false) }
+    var soundPreparing by remember { mutableStateOf(false) }
+    var soundEvents by remember { mutableStateOf(emptyList<SoundEvent>()) }
+
+    val soundMonitor = remember(context) { SoundEventMonitor(context) }
+    DisposableEffect(soundMonitor) {
+        onDispose { soundMonitor.destroy() }
+    }
+
+    val diarizationController = remember(context) { SpeakerDiarizationController(context) }
+    DisposableEffect(diarizationController) {
+        onDispose { diarizationController.destroy() }
+    }
+
+    val objectDetector = remember(context) { OfflineObjectDetector(context) }
+    DisposableEffect(objectDetector) {
+        onDispose { scope.launch { objectDetector.close() } }
+    }
 
     val tts = remember(context) {
         TextToSpeech(context) { result ->
@@ -103,10 +128,89 @@ fun GlazouhApp() {
         onDispose { captionController.destroy() }
     }
 
+    val sherpaCaptionController = remember(context) {
+        SherpaRussianCaptionController(context).also { controller ->
+            // Text and status callbacks are always dispatched to Android's main thread.
+        }
+    }
+    DisposableEffect(sherpaCaptionController) {
+        onDispose { sherpaCaptionController.destroy() }
+    }
+
+    fun startSelectedCaptionEngine() {
+        if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
+            captionController.start(captionLanguage)
+        } else {
+            if (captionLanguage != "ru-RU") {
+                status = "Модель T-one поддерживает русский язык. Выберите русский или системный движок Android."
+                return
+            }
+            scope.launch {
+                try {
+                    sherpaCaptionController.start(
+                        onText = { text, isFinal ->
+                            if (isFinal) {
+                                transcript = (transcript + text).takeLast(30)
+                                partialCaption = ""
+                            } else {
+                                partialCaption = text
+                            }
+                        },
+                        onStatus = { status = it }
+                    )
+                } catch (error: Exception) {
+                    status = error.localizedMessage ?: "Не удалось запустить русскую модель T-one."
+                }
+            }
+        }
+    }
+
+    fun startSoundMonitoring() {
+        if (soundPreparing || soundMonitoring) return
+        soundPreparing = true
+        scope.launch {
+            try {
+                soundMonitor.start(
+                    onStatus = { message -> scope.launch { status = message } },
+                    onEvents = { events -> scope.launch { soundEvents = events } }
+                )
+                soundMonitoring = true
+            } catch (error: Exception) {
+                soundMonitoring = false
+                status = error.localizedMessage ?: "Не удалось запустить распознавание звуков."
+            } finally {
+                soundPreparing = false
+            }
+        }
+    }
+
+    val soundPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startSoundMonitoring()
+        else status = "Для распознавания звуков нужно разрешение на микрофон."
+    }
+
+    val diarizationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            scope.launch {
+                try {
+                    diarizationController.start { message -> scope.launch { status = message } }
+                    diarizationRecording = true
+                } catch (error: Exception) {
+                    diarizationRecording = false
+                    status = error.localizedMessage ?: "Не удалось начать запись разговора."
+                }
+            }
+        } else status = "Для разделения собеседников нужно разрешение на микрофон."
+    }
+
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) captionController.start()
+        if (granted) startSelectedCaptionEngine()
         else status = "Для субтитров нужно разрешение на микрофон."
     }
 
@@ -137,14 +241,26 @@ fun GlazouhApp() {
                     MainMode.HOME -> {
                         LargeActionButton("Прочитать текст камерой") { mode = MainMode.READER }
                         LargeActionButton("Живые офлайн-субтитры") { mode = MainMode.CAPTIONS }
+                        LargeActionButton("Распознать предметы на фото") { mode = MainMode.OBJECTS }
+                        if (BuildConfig.SHERPA_ENABLED) {
+                            LargeActionButton("Разделить собеседников · офлайн") {
+                                speakerSegments = emptyList()
+                                mode = MainMode.DIARIZATION
+                            }
+                        }
+                        if (BuildConfig.SHERPA_ENABLED) {
+                            LargeActionButton("Распознавать окружающие звуки · офлайн") {
+                                soundEvents = emptyList()
+                                mode = MainMode.SOUNDS
+                            }
+                        }
                         Text(
                             "Камера и распознавание текста работают на телефоне. " +
                                 "При первом запуске потребуется скачать языковые модели.",
                             fontSize = 16.sp
                         )
                         Text(
-                            "Субтитры используют системный офлайн-движок Android, если он доступен. " +
-                                "Распознавание говорящих пока не реализовано.",
+                            "Субтитры используют локальный движок Android или T-one. В полной версии есть отдельный офлайн-анализ голосов собеседников.",
                             fontSize = 16.sp
                         )
                     }
@@ -172,7 +288,7 @@ fun GlazouhApp() {
                                         } else {
                                             status = "Готово. Прочитанный текст показан ниже."
                                             if (ttsReady) {
-                                                tts.speak(result, TextToSpeech.QUEUE_FLUSH, null, "glazouh-ocr")
+                                                speakLongText(tts, result, "glazouh-ocr")
                                             } else {
                                                 status = "Текст распознан; голосовой движок пока не готов."
                                             }
@@ -199,8 +315,18 @@ fun GlazouhApp() {
                             )
                             LargeActionButton("Прочитать ещё раз") {
                                 if (ttsReady) {
-                                    tts.speak(recognizedText, TextToSpeech.QUEUE_FLUSH, null, "glazouh-repeat")
+                                    speakLongText(tts, recognizedText, "glazouh-repeat")
+                                    status = "Читаю распознанный текст."
                                 }
+                            }
+                            LargeActionButton("Остановить озвучивание") {
+                                tts.stop()
+                                status = "Озвучивание остановлено."
+                            }
+                            LargeActionButton("Скопировать текст") {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("ГлазУх", recognizedText))
+                                status = "Текст скопирован в буфер обмена."
                             }
                         }
                         Text(
@@ -211,25 +337,199 @@ fun GlazouhApp() {
                         )
                     }
 
-                    MainMode.CAPTIONS -> {
+                    MainMode.OBJECTS -> {
+                        ObjectDetectionScreen(
+                            detector = objectDetector,
+                            tts = tts,
+                            ttsReady = ttsReady,
+                            onBack = { mode = MainMode.HOME },
+                            onStatus = { status = it }
+                        )
+                    }
+
+                    MainMode.DIARIZATION -> {
                         LargeActionButton("Назад") {
-                            captionController.stop()
+                            diarizationController.cancel()
+                            diarizationRecording = false
                             mode = MainMode.HOME
                         }
                         Text(
-                            "Речь распознаётся системным офлайн-сервисом Android. " +
-                                "Если на устройстве нет локальной модели русского языка, режим не запустится.",
+                            "Запишите короткий фрагмент разговора. После остановки ГлазУх локально выделит голосовые отрезки и подпишет их нейтральными номерами. Запись не сохраняется в файл и удаляется из памяти после анализа.",
                             fontSize = 17.sp
                         )
+                        Text(
+                            "Первый запуск скачает две модели (примерно 47 МБ суммарно). Анализ выполняется на телефоне; поддерживается запись до 3 минут.",
+                            fontSize = 15.sp
+                        )
+                        if (!diarizationRecording) {
+                            LargeActionButton("Начать запись разговора") {
+                                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                if (granted) {
+                                    scope.launch {
+                                        try {
+                                            diarizationController.start { message -> scope.launch { status = message } }
+                                            diarizationRecording = true
+                                        } catch (error: Exception) {
+                                            diarizationRecording = false
+                                            status = error.localizedMessage ?: "Не удалось начать запись."
+                                        }
+                                    }
+                                } else diarizationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        } else {
+                            LargeActionButton("Остановить и определить говорящих") {
+                                scope.launch {
+                                    try {
+                                        speakerSegments = diarizationController.stopAndAnalyze { message -> scope.launch { status = message } }
+                                    } catch (error: Exception) {
+                                        status = error.localizedMessage ?: "Не удалось проанализировать запись."
+                                    } finally {
+                                        diarizationRecording = false
+                                    }
+                                }
+                            }
+                        }
+                        if (speakerSegments.isNotEmpty()) {
+                            Text("Найденные голосовые фрагменты", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                            speakerSegments.forEach { segment ->
+                                val start = String.format(Locale.US, "%.1f", segment.startSeconds)
+                                val end = String.format(Locale.US, "%.1f", segment.endSeconds)
+                                Text(
+                                    "Собеседник ${segment.speakerIndex + 1} · $start–$end сек.",
+                                    fontSize = 19.sp,
+                                    modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
+                                )
+                            }
+                        } else if (!diarizationRecording) {
+                            Text("Результаты появятся здесь после анализа записи.", fontSize = 17.sp)
+                        }
+                        Text(
+                            "Номера обозначают только акустически похожие голосовые фрагменты. Это не распознавание личности; результат может ошибаться, особенно при перебиваниях, шуме и похожих голосах.",
+                            color = Color(0xFFFFD166),
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    MainMode.SOUNDS -> {
+                        LargeActionButton("Назад") {
+                            soundMonitor.stop()
+                            soundMonitoring = false
+                            soundPreparing = false
+                            mode = MainMode.HOME
+                        }
+                        Text(
+                            "YAMNet анализирует звук с микрофона прямо на телефоне и распознаёт до 521 категорий: сирены, звонки, лай, стук, дождь, речь и другие события.",
+                            fontSize = 17.sp
+                        )
+                        Text(
+                            "При первом запуске скачивается модель около 4 МБ. После загрузки интернет не нужен. Результаты — оценки модели, а не гарантированно верные определения.",
+                            fontSize = 15.sp
+                        )
+                        if (soundPreparing) {
+                            Text("Подготавливаю модель и микрофон…", fontSize = 18.sp)
+                        } else if (!soundMonitoring) {
+                            LargeActionButton("Начать распознавание звуков") {
+                                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                if (granted) startSoundMonitoring()
+                                else soundPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        } else {
+                            LargeActionButton("Остановить распознавание") {
+                                soundMonitor.stop()
+                                soundMonitoring = false
+                                status = "Распознавание звуков остановлено."
+                            }
+                        }
+                        Text("Последние распознанные звуки", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                        if (soundEvents.isEmpty()) {
+                            Text("Пока нет уверенно распознанных событий.", fontSize = 18.sp)
+                        } else {
+                            soundEvents.forEach { event ->
+                                Text(
+                                    event.label + " · оценка модели " + String.format(Locale.US, "%.2f", event.score),
+                                    fontSize = 20.sp,
+                                    modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
+                                )
+                            }
+                        }
+                        Text(
+                            "Это вспомогательная классификация окружающих звуков. Она может пропустить реальный сигнал тревоги или ошибочно определить звук; не используйте её как единственную систему оповещения.",
+                            color = Color(0xFFFFD166),
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    MainMode.CAPTIONS -> {
+                        LargeActionButton("Назад") {
+                            captionController.stop()
+                            sherpaCaptionController.stop()
+                            mode = MainMode.HOME
+                        }
+                        if (BuildConfig.SHERPA_ENABLED) {
+                            LargeActionButton(
+                                if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
+                                    "Движок: Android · переключить на T-one"
+                                } else {
+                                    "Движок: T-one · переключить на Android"
+                                }
+                            ) {
+                                captionController.stop()
+                                sherpaCaptionController.stop()
+                                captionEngine = if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
+                                    CaptionEngine.SHERPA_T_ONE
+                                } else {
+                                    CaptionEngine.ANDROID_SYSTEM
+                                }
+                                partialCaption = ""
+                                status = if (captionEngine == CaptionEngine.SHERPA_T_ONE) {
+                                    "Выбран русский движок T-one. При первом запуске загрузится модель около 144 МБ."
+                                } else {
+                                    "Выбран системный локальный движок Android."
+                                }
+                            }
+                        }
+                        Text(
+                            if (captionEngine == CaptionEngine.SHERPA_T_ONE) {
+                                "T-one распознаёт русскую речь локально. При первом запуске требуется скачать модель около 144 МБ; после загрузки интернет не нужен. Модель обучена преимущественно на телефонной речи."
+                            } else {
+                                "Речь распознаётся системным офлайн-сервисом Android. Если на телефоне нет локальной модели выбранного языка, режим не запустится."
+                            },
+                            fontSize = 16.sp
+                        )
+                        LargeActionButton(
+                            if (captionLanguage == "ru-RU") {
+                                "Язык: Русский · нажмите для English"
+                            } else {
+                                "Language: English · нажмите для Русский"
+                            }
+                        ) {
+                            captionController.stop()
+                            sherpaCaptionController.stop()
+                            captionLanguage = if (captionLanguage == "ru-RU") "en-US" else "ru-RU"
+                            partialCaption = ""
+                            status = if (captionLanguage == "ru-RU") {
+                                "Выбран русский язык. Нажмите «Начать субтитры»."
+                            } else {
+                                "Выбран английский язык. Нажмите «Начать субтитры»."
+                            }
+                        }
                         LargeActionButton("Начать субтитры") {
                             val granted = ContextCompat.checkSelfPermission(
                                 context,
                                 Manifest.permission.RECORD_AUDIO
                             ) == PackageManager.PERMISSION_GRANTED
-                            if (granted) captionController.start()
+                            if (granted) startSelectedCaptionEngine()
                             else micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
-                        LargeActionButton("Остановить") { captionController.stop() }
+                        LargeActionButton("Остановить") {
+                            captionController.stop()
+                            sherpaCaptionController.stop()
+                        }
+                        LargeActionButton("Очистить стенограмму") {
+                            transcript = emptyList()
+                            partialCaption = ""
+                            status = "Стенограмма очищена."
+                        }
                         Text("Последняя фраза", fontSize = 21.sp, fontWeight = FontWeight.Bold)
                         Text(
                             partialCaption.ifBlank { "Пока тишина." },
@@ -239,7 +539,7 @@ fun GlazouhApp() {
                         Text("Стенограмма", fontSize = 21.sp, fontWeight = FontWeight.Bold)
                         transcript.forEachIndexed { index, line ->
                             Text(
-                                "\${index + 1}. $line",
+                                "${index + 1}. $line",
                                 fontSize = 19.sp,
                                 modifier = Modifier.fillMaxWidth().semantics {
                                     liveRegion = LiveRegionMode.Polite
@@ -264,6 +564,15 @@ fun GlazouhApp() {
                 )
             }
         }
+    }
+}
+
+private fun speakLongText(tts: TextToSpeech, text: String, utterancePrefix: String) {
+    val chunks = SpeechTextChunker.split(text, TextToSpeech.getMaxSpeechInputLength())
+    val requestId = "$utterancePrefix-${System.nanoTime()}"
+    chunks.forEachIndexed { index, chunk ->
+        val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+        tts.speak(chunk, queueMode, null, "$requestId-$index")
     }
 }
 

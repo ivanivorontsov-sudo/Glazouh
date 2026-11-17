@@ -139,6 +139,7 @@ private fun captureImage(
 ) {
     val outputFile = File(context.cacheDir, "glazouh-capture-${System.nanoTime()}.jpg")
     val outputOptions = ImageCapture.OutputFileOptions.Builder(outputFile).build()
+    val mainExecutor = ContextCompat.getMainExecutor(context)
     onStatus("Снимаю изображение…")
 
     imageCapture.takePicture(
@@ -147,9 +148,9 @@ private fun captureImage(
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                 try {
-                    val rawBitmap = BitmapFactory.decodeFile(outputFile.absolutePath)
+                    val rawBitmap = decodeForOcr(outputFile)
                     if (rawBitmap == null) {
-                        onStatus("Не удалось прочитать снимок")
+                        mainExecutor.execute { onStatus("Не удалось прочитать снимок") }
                         return
                     }
                     val rotation = runCatching {
@@ -159,13 +160,17 @@ private fun captureImage(
                         val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
                         Bitmap.createBitmap(
                             rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true
-                        ).also { rawBitmap.recycle() }
+                        ).also { rotated ->
+                            if (rotated !== rawBitmap) rawBitmap.recycle()
+                        }
                     } else {
                         rawBitmap
                     }
-                    onCaptured(finalBitmap)
+                    mainExecutor.execute { onCaptured(finalBitmap) }
                 } catch (error: Exception) {
-                    onStatus("Ошибка обработки снимка: ${error.localizedMessage ?: "ошибка"}")
+                    mainExecutor.execute {
+                        onStatus("Ошибка обработки снимка: ${error.localizedMessage ?: "ошибка"}")
+                    }
                 } finally {
                     outputFile.delete()
                 }
@@ -173,8 +178,36 @@ private fun captureImage(
 
             override fun onError(exception: ImageCaptureException) {
                 outputFile.delete()
-                onStatus("Ошибка камеры: ${exception.localizedMessage ?: "неизвестная ошибка"}")
+                mainExecutor.execute {
+                    onStatus("Ошибка камеры: ${exception.localizedMessage ?: "неизвестная ошибка"}")
+                }
             }
         }
     )
 }
+
+/**
+ * Decodes a bounded image for OCR instead of allocating a full-resolution camera bitmap.
+ * A 12 MP capture is sampled down to roughly 3 MP, reducing peak memory use substantially.
+ */
+private fun decodeForOcr(file: File): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    var sampleSize = 1
+    while (
+        bounds.outWidth / sampleSize > MAX_OCR_IMAGE_DIMENSION ||
+        bounds.outHeight / sampleSize > MAX_OCR_IMAGE_DIMENSION
+    ) {
+        sampleSize *= 2
+    }
+
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sampleSize
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    }
+    return BitmapFactory.decodeFile(file.absolutePath, options)
+}
+
+private const val MAX_OCR_IMAGE_DIMENSION = 2560
