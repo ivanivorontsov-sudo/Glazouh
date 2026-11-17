@@ -39,7 +39,7 @@ Keep the app native Kotlin/Compose and add optional, separately loaded on-device
 2. Add bilingual (Russian/English) object labels and accessibility tests.
 3. Benchmark PaddleOCR beside Tesseract on a repeatable Russian/English test set.
 4. Benchmark the opt-in T-one streaming speech engine on clean speech, phone calls, noisy rooms and far-field audio; keep Android system speech as an alternative.
-5. Prototype sherpa-onnx speaker diarization only after verifying each segmentation/embedding model license and model hash. Output speaker numbers, never person names.
+5. Full now includes an opt-in offline diarization screen for recordings up to 3 minutes. It uses sherpa-onnx Kotlin API with pyannote segmentation and 3D-Speaker embeddings; both model downloads are size-bounded and SHA-256 verified. Output is limited to numbered voice segments, never person names. Real-device accuracy, battery use and memory pressure still require testing.
 6. Train a ruble classifier only after reviewing dataset source, class balance, old/new note coverage and independent real-world test images.
 7. Treat traffic-light analysis as a separate safety-critical research project with conservative state machines, extensive replay tests and outdoor validation.
 
