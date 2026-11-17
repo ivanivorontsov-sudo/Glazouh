@@ -1,11 +1,13 @@
 package org.glazouh.app
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.pm.PackageManager
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -67,6 +69,7 @@ fun GlazouhApp() {
     var isReading by remember { mutableStateOf(false) }
     var transcript by remember { mutableStateOf(emptyList<String>()) }
     var partialCaption by remember { mutableStateOf("") }
+    var captionLanguage by remember { mutableStateOf("ru-RU") }
     var ttsReady by remember { mutableStateOf(false) }
 
     val tts = remember(context) {
@@ -106,7 +109,7 @@ fun GlazouhApp() {
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) captionController.start()
+        if (granted) captionController.start(captionLanguage)
         else status = "Для субтитров нужно разрешение на микрофон."
     }
 
@@ -172,7 +175,7 @@ fun GlazouhApp() {
                                         } else {
                                             status = "Готово. Прочитанный текст показан ниже."
                                             if (ttsReady) {
-                                                tts.speak(result, TextToSpeech.QUEUE_FLUSH, null, "glazouh-ocr")
+                                                speakLongText(tts, result, "glazouh-ocr")
                                             } else {
                                                 status = "Текст распознан; голосовой движок пока не готов."
                                             }
@@ -199,8 +202,18 @@ fun GlazouhApp() {
                             )
                             LargeActionButton("Прочитать ещё раз") {
                                 if (ttsReady) {
-                                    tts.speak(recognizedText, TextToSpeech.QUEUE_FLUSH, null, "glazouh-repeat")
+                                    speakLongText(tts, recognizedText, "glazouh-repeat")
+                                    status = "Читаю распознанный текст."
                                 }
+                            }
+                            LargeActionButton("Остановить озвучивание") {
+                                tts.stop()
+                                status = "Озвучивание остановлено."
+                            }
+                            LargeActionButton("Скопировать текст") {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("ГлазУх", recognizedText))
+                                status = "Текст скопирован в буфер обмена."
                             }
                         }
                         Text(
@@ -218,18 +231,39 @@ fun GlazouhApp() {
                         }
                         Text(
                             "Речь распознаётся системным офлайн-сервисом Android. " +
-                                "Если на устройстве нет локальной модели русского языка, режим не запустится.",
+                                "Если на устройстве нет локальной модели выбранного языка, режим не запустится.",
                             fontSize = 17.sp
                         )
+                        LargeActionButton(
+                            if (captionLanguage == "ru-RU") {
+                                "Язык: Русский · нажмите для English"
+                            } else {
+                                "Language: English · нажмите для Русский"
+                            }
+                        ) {
+                            captionController.stop()
+                            captionLanguage = if (captionLanguage == "ru-RU") "en-US" else "ru-RU"
+                            partialCaption = ""
+                            status = if (captionLanguage == "ru-RU") {
+                                "Выбран русский язык. Нажмите «Начать субтитры»."
+                            } else {
+                                "Выбран английский язык. Нажмите «Начать субтитры»."
+                            }
+                        }
                         LargeActionButton("Начать субтитры") {
                             val granted = ContextCompat.checkSelfPermission(
                                 context,
                                 Manifest.permission.RECORD_AUDIO
                             ) == PackageManager.PERMISSION_GRANTED
-                            if (granted) captionController.start()
+                            if (granted) captionController.start(captionLanguage)
                             else micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
                         LargeActionButton("Остановить") { captionController.stop() }
+                        LargeActionButton("Очистить стенограмму") {
+                            transcript = emptyList()
+                            partialCaption = ""
+                            status = "Стенограмма очищена."
+                        }
                         Text("Последняя фраза", fontSize = 21.sp, fontWeight = FontWeight.Bold)
                         Text(
                             partialCaption.ifBlank { "Пока тишина." },
@@ -239,7 +273,7 @@ fun GlazouhApp() {
                         Text("Стенограмма", fontSize = 21.sp, fontWeight = FontWeight.Bold)
                         transcript.forEachIndexed { index, line ->
                             Text(
-                                "\${index + 1}. $line",
+                                "${index + 1}. $line",
                                 fontSize = 19.sp,
                                 modifier = Modifier.fillMaxWidth().semantics {
                                     liveRegion = LiveRegionMode.Polite
@@ -264,6 +298,15 @@ fun GlazouhApp() {
                 )
             }
         }
+    }
+}
+
+private fun speakLongText(tts: TextToSpeech, text: String, utterancePrefix: String) {
+    val chunks = SpeechTextChunker.split(text, TextToSpeech.getMaxSpeechInputLength())
+    val requestId = "$utterancePrefix-${System.nanoTime()}"
+    chunks.forEachIndexed { index, chunk ->
+        val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+        tts.speak(chunk, queueMode, null, "$requestId-$index")
     }
 }
 
