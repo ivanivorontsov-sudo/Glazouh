@@ -35,6 +35,7 @@ class SpeakerDiarizationController(context: Context) {
     private val appContext = context.applicationContext
     private val running = AtomicBoolean(false)
     private val preparing = AtomicBoolean(false)
+    private val cancelRequested = AtomicBoolean(false)
     @Volatile private var hasRecording = false
     private val samplesLock = Any()
     @Volatile private var recorder: AudioRecord? = null
@@ -46,6 +47,7 @@ class SpeakerDiarizationController(context: Context) {
 
     suspend fun start(onStatus: (String) -> Unit) = withContext(Dispatchers.IO) {
         check(preparing.compareAndSet(false, true)) { "Подготовка записи уже выполняется." }
+        cancelRequested.set(false)
         try {
         check(appContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             "Для разделения собеседников нужно разрешение на микрофон."
@@ -54,6 +56,7 @@ class SpeakerDiarizationController(context: Context) {
         check(worker?.isAlive != true) { "Предыдущая запись ещё завершается." }
         onStatus("Проверяю модели разделения собеседников…")
         ensureModels(onStatus)
+        check(!cancelRequested.get()) { "Подготовка записи отменена." }
         synchronized(samplesLock) {
             sampleCount = 0
             truncated = false
@@ -75,6 +78,7 @@ class SpeakerDiarizationController(context: Context) {
             "Не удалось открыть микрофон."
         }
         try {
+            check(!cancelRequested.get()) { "Подготовка записи отменена." }
             activeRecorder.startRecording()
             check(activeRecorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                 "Не удалось начать запись."
@@ -200,6 +204,7 @@ class SpeakerDiarizationController(context: Context) {
         }
 
     fun cancel() {
+        cancelRequested.set(true)
         running.set(false)
         hasRecording = false
         recorder?.let { active ->
@@ -345,6 +350,7 @@ class SpeakerDiarizationController(context: Context) {
                     val buffer = ByteArray(64 * 1024)
                     var total = 0L
                     while (true) {
+                        check(!cancelRequested.get()) { "Загрузка модели отменена." }
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
