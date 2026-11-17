@@ -49,6 +49,8 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:1.4.1")
 
     implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
+    // On-device COCO object detection. Model file is downloaded on demand and SHA-256 verified.
+    implementation("com.google.mediapipe:tasks-vision:1.2.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
