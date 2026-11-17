@@ -55,3 +55,15 @@ Keep the app native Kotlin/Compose and add optional, separately loaded on-device
 - VIA Safe Crosswalk: https://github.com/25-p-project-team-6/VIA-Safe-Crosswalk
 - SightBuddy: https://github.com/DrophouseLtd/SightBuddy
 - SmolVLM model card: https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct
+
+
+## Additional repository audit (17 Nov 2026)
+
+Two visually promising projects were deliberately excluded from code reuse after reading their actual repository files:
+
+- [C Around](https://github.com/Cambric-software/c-around) advertises useful offline functions (YOLO camera awareness, YAMNet 521-class sound monitoring, face recognition and Whisper captions), but its checked-in `LICENSE` explicitly says **proprietary / all rights reserved / not open source**. Its public source is for inspection only; do not copy or derive code from it without written permission. It can be evaluated as a separate user-facing product, not as a source of code for ГлазУх.
+- [Atlas Sight](https://github.com/Digitalbrainstem/atlas-sight) describes an offline accessibility assistant and shows an MIT badge in its README, but the repository's root file list and GitHub license metadata did not expose a LICENSE file/license identifier at the time checked. Do not import code until the copyright holder supplies a verifiable license file and the actual mobile/runtime/model provenance is audited.
+
+### Ruble dataset note
+
+[ Dderedor/kupuri ](https://huggingface.co/datasets/Dderedor/kupuri) is listed as MIT on Hugging Face and contains 886 training images plus validation/test splits (949 images total) across 9 denomination classes. It is a useful seed dataset, not a release-ready benchmark: the sample is small, and its coverage of banknote generations, folds, glare, blur, counterfeit lookalikes and worn notes must be independently assessed. Keep "unknown / cannot identify" as a valid outcome. Never claim authenticity detection from denomination classification.
