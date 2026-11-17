@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -178,7 +179,6 @@ fun LiveObjectDetectionCamera(
             active = false
             analysis.clearAnalyzer()
             provider?.unbindAll()
-            analysis.close()
             cameraExecutor.shutdown()
         }
     }
@@ -194,7 +194,7 @@ fun LiveObjectDetectionCamera(
             } else {
                 "Подключаю камеру…"
             },
-            fontSize = 15.dp.value.let { androidx.compose.ui.unit.sp(it) }
+            fontSize = 15.sp
         )
     }
 }
