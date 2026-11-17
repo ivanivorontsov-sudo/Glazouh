@@ -164,6 +164,7 @@ class SpeakerDiarizationController(context: Context) {
             val floatSamples = FloatArray(captured.size) { captured[it].toFloat() / 32768f }
             try {
                 val models = ensureModels(onStatus)
+                check(!cancelRequested.get()) { "Анализ разговора отменён." }
                 val diarizer = OfflineSpeakerDiarization(
                     config = OfflineSpeakerDiarizationConfig(
                         segmentation = OfflineSpeakerSegmentationModelConfig(
@@ -189,6 +190,7 @@ class SpeakerDiarizationController(context: Context) {
                         "Модель ожидает " + diarizer.sampleRate() + " Гц, запись выполнена с частотой " + SAMPLE_RATE + " Гц."
                     }
                     val result = diarizer.process(floatSamples)
+                    check(!cancelRequested.get()) { "Анализ разговора отменён." }
                     val segments = result.map {
                         SpeakerSegment(it.start, it.end, it.speaker)
                     }.filter { it.endSeconds > it.startSeconds }
