@@ -285,25 +285,27 @@ fun GlazouhApp() {
                             sherpaCaptionController.stop()
                             mode = MainMode.HOME
                         }
-                        LargeActionButton(
-                            if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
-                                "Движок: Android · переключить на T-one"
-                            } else {
-                                "Движок: T-one · переключить на Android"
-                            }
-                        ) {
-                            captionController.stop()
-                            sherpaCaptionController.stop()
-                            captionEngine = if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
-                                CaptionEngine.SHERPA_T_ONE
-                            } else {
-                                CaptionEngine.ANDROID_SYSTEM
-                            }
-                            partialCaption = ""
-                            status = if (captionEngine == CaptionEngine.SHERPA_T_ONE) {
-                                "Выбран русский движок T-one. При первом запуске загрузится модель около 144 МБ."
-                            } else {
-                                "Выбран системный локальный движок Android."
+                        if (BuildConfig.SHERPA_ENABLED) {
+                            LargeActionButton(
+                                if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
+                                    "Движок: Android · переключить на T-one"
+                                } else {
+                                    "Движок: T-one · переключить на Android"
+                                }
+                            ) {
+                                captionController.stop()
+                                sherpaCaptionController.stop()
+                                captionEngine = if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
+                                    CaptionEngine.SHERPA_T_ONE
+                                } else {
+                                    CaptionEngine.ANDROID_SYSTEM
+                                }
+                                partialCaption = ""
+                                status = if (captionEngine == CaptionEngine.SHERPA_T_ONE) {
+                                    "Выбран русский движок T-one. При первом запуске загрузится модель около 144 МБ."
+                                } else {
+                                    "Выбран системный локальный движок Android."
+                                }
                             }
                         }
                         Text(
