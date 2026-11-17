@@ -48,4 +48,32 @@ This file is a convenience notice, not a replacement for the full upstream licen
 - Expected model SHA-256: `5ded080e2a6c86ecc11bcb0902d77524eb3e8b0844cb0c0754347f5aafb4dabc`
 - Model weights are downloaded only after the user explicitly selects T-one captions in the Full variant, kept in app-private storage, and verified before loading.
 - The small token table is included in `app/src/full/assets/sherpa-t-one/tokens.txt` and has its own pinned SHA-256 check.
-- T-one is trained primarily for telephony speech; accuracy in noisy outdoor or far-field conditions requires testing. It is not a speaker identity system.\n\n## Offline speaker diarization models\n\n### pyannote segmentation 3.0 (sherpa-onnx export)\n\n- Original model: https://huggingface.co/pyannote/segmentation-3.0\n- Runtime archive: https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models\n- License: MIT for the model weights; the sherpa-onnx conversion/runtime code is Apache-2.0.\n- Downloaded archive: `sherpa-onnx-pyannote-segmentation-3-0.tar.bz2`\n- Expected size: 6,958,444 bytes\n- Expected SHA-256: `24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488`\n- The archive is verified before extraction; only the expected `model.onnx` entry is extracted.\n\n### 3D-Speaker ERes2Net embedding model\n\n- File: `3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx`\n- Source release: https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models\n- Upstream model card identifies Apache License 2.0: https://modelscope.cn/models/iic/speech_eres2net_base_sv_zh-cn_3dspeaker_16k\n- Expected size: 39,593,761 bytes\n- Expected SHA-256: `1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b`\n- Downloaded only on first use, stored in app-private storage and verified before inference.\n\n### Apache Commons Compress\n\n- Component: `org.apache.commons:commons-compress:1.27.1`\n- License: Apache License 2.0\n- Source: https://commons.apache.org/proper/commons-compress/\n- Used only in Full to safely extract the hash-verified BZip2/TAR segmentation model archive.
+- T-one is trained primarily for telephony speech; accuracy in noisy outdoor or far-field conditions requires testing. It is not a speaker identity system.
+
+## Offline speaker diarization models
+
+### pyannote segmentation 3.0 (sherpa-onnx export)
+
+- Original model: https://huggingface.co/pyannote/segmentation-3.0
+- Runtime archive: https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models
+- License: MIT for the model weights; the sherpa-onnx conversion/runtime code is Apache-2.0.
+- Downloaded archive: `sherpa-onnx-pyannote-segmentation-3-0.tar.bz2`
+- Expected size: 6,958,444 bytes
+- Expected SHA-256: `24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488`
+- The archive is verified before extraction; only the expected `model.onnx` entry is extracted.
+
+### 3D-Speaker ERes2Net embedding model
+
+- File: `3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx`
+- Source release: https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models
+- Upstream model card identifies Apache License 2.0: https://modelscope.cn/models/iic/speech_eres2net_base_sv_zh-cn_3dspeaker_16k
+- Expected size: 39,593,761 bytes
+- Expected SHA-256: `1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b`
+- Downloaded only on first use, stored in app-private storage and verified before inference.
+
+### Apache Commons Compress
+
+- Component: `org.apache.commons:commons-compress:1.27.1`
+- License: Apache License 2.0
+- Source: https://commons.apache.org/proper/commons-compress/
+- Used only in Full to safely extract the hash-verified BZip2/TAR segmentation model archive.
