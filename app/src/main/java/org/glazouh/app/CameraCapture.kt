@@ -106,7 +106,7 @@ fun CameraCapture(
                 onStatus("Камера готова. Наведите её на надпись и сделайте снимок.")
             } catch (error: Exception) {
                 cameraReady = false
-                onStatus("Не удалось открыть камеру: \${error.localizedMessage ?: "ошибка"}")
+                onStatus("Не удалось открыть камеру: ${error.localizedMessage ?: "ошибка"}")
             }
         }, ContextCompat.getMainExecutor(context))
 
@@ -137,7 +137,7 @@ private fun captureImage(
     onCaptured: (Bitmap) -> Unit,
     onStatus: (String) -> Unit
 ) {
-    val outputFile = File(context.cacheDir, "glazouh-capture-\${System.nanoTime()}.jpg")
+    val outputFile = File(context.cacheDir, "glazouh-capture-${System.nanoTime()}.jpg")
     val outputOptions = ImageCapture.OutputFileOptions.Builder(outputFile).build()
     onStatus("Снимаю изображение…")
 
@@ -165,7 +165,7 @@ private fun captureImage(
                     }
                     onCaptured(finalBitmap)
                 } catch (error: Exception) {
-                    onStatus("Ошибка обработки снимка: \${error.localizedMessage ?: "ошибка"}")
+                    onStatus("Ошибка обработки снимка: ${error.localizedMessage ?: "ошибка"}")
                 } finally {
                     outputFile.delete()
                 }
@@ -173,7 +173,7 @@ private fun captureImage(
 
             override fun onError(exception: ImageCaptureException) {
                 outputFile.delete()
-                onStatus("Ошибка камеры: \${exception.localizedMessage ?: "неизвестная ошибка"}")
+                onStatus("Ошибка камеры: ${exception.localizedMessage ?: "неизвестная ошибка"}")
             }
         }
     )
