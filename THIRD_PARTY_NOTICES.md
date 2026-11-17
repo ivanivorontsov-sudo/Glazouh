@@ -100,3 +100,22 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+## MediaPipe Tasks Audio
+
+- Component: `com.google.mediapipe:tasks-audio:1.2.2`
+- Copyright: Google LLC / MediaPipe Authors
+- License: Apache License 2.0
+- Source: https://github.com/google-ai-edge/mediapipe
+- Used only in the Full variant for on-device sound event classification.
+
+## YAMNet sound event model
+
+- Model: `yamnet.tflite`
+- Official model URL: https://storage.googleapis.com/mediapipe-models/audio_classifier/yamnet/float32/1/yamnet.tflite
+- Model SHA-256: `4d8b4a53282dc83ef04e3e7dbc4fbc98082e34e44ed798e16c3a0cdd4c584faf`
+- Model license: Apache License 2.0.
+- The model is downloaded on demand, stored in app-private storage, size-bounded and SHA-256 verified before loading.
+- The 521 AudioSet class labels/ontology are attributed to Google LLC under CC BY 4.0: https://research.google.com/audioset/
+- YAMNet scores are not calibrated probabilities and are not a safety-certified alarm detector.
