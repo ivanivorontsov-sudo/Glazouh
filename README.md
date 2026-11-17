@@ -75,7 +75,7 @@
 # Облегчённая версия без дополнительного speech runtime
 gradle assembleLiteDebug
 
-# Полная версия с русским потоковым ASR T-one
+# Полная версия с русским потоковым ASR T-one и диаризацией
 gradle assembleFullDebug
 ```
 
