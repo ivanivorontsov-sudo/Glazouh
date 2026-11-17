@@ -35,6 +35,7 @@ class SpeakerDiarizationController(context: Context) {
     private val appContext = context.applicationContext
     private val running = AtomicBoolean(false)
     private val preparing = AtomicBoolean(false)
+    private val analyzing = AtomicBoolean(false)
     private val cancelRequested = AtomicBoolean(false)
     @Volatile private var hasRecording = false
     private val samplesLock = Any()
@@ -126,6 +127,8 @@ class SpeakerDiarizationController(context: Context) {
 
     suspend fun stopAndAnalyze(onStatus: (String) -> Unit): List<SpeakerSegment> =
         withContext(Dispatchers.IO) {
+            check(analyzing.compareAndSet(false, true)) { "Анализ разговора уже выполняется." }
+            try {
             check(hasRecording) { "Сейчас нет активной записи." }
             running.set(false)
             recorder?.let { active ->
@@ -200,6 +203,9 @@ class SpeakerDiarizationController(context: Context) {
             } finally {
                 captured.fill(0)
                 floatSamples.fill(0f)
+            }
+            } finally {
+                analyzing.set(false)
             }
         }
 
