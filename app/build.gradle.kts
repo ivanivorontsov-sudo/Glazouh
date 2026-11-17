@@ -32,8 +32,26 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
+
+    flavorDimensions += "speech"
+    productFlavors {
+        create("lite") {
+            dimension = "speech"
+            versionNameSuffix = "-lite"
+            buildConfigField("boolean", "SHERPA_ENABLED", "false")
+        }
+        create("full") {
+            dimension = "speech"
+            applicationIdSuffix = ".full"
+            versionNameSuffix = "-full"
+            buildConfigField("boolean", "SHERPA_ENABLED", "true")
+        }
+    }
 }
 
 
@@ -102,7 +120,8 @@ val downloadSherpaOnnx = tasks.register("downloadSherpaOnnx") {
     }
 }
 
-tasks.named("preBuild").configure {
+// Download the optional native speech runtime only for Full variants.
+tasks.matching { it.name.startsWith("preFull") }.configureEach {
     dependsOn(downloadSherpaOnnx)
 }
 
@@ -126,7 +145,7 @@ dependencies {
     // On-device COCO object detection. Model file is downloaded on demand and SHA-256 verified.
     implementation("com.google.mediapipe:tasks-vision:1.2.2")
     // Apache-2.0 offline Russian streaming ASR runtime; downloaded and SHA-256 verified by Gradle.
-    implementation(files(sherpaOnnxAar))
+    "fullImplementation"(files(sherpaOnnxAar))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
