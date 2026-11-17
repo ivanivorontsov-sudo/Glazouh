@@ -57,7 +57,7 @@ private val GlazouhColors = darkColorScheme(
     error = Color(0xFFFF6B6B)
 )
 
-private enum class MainMode { HOME, READER, CAPTIONS, OBJECTS, DIARIZATION }
+private enum class MainMode { HOME, READER, CAPTIONS, OBJECTS, DIARIZATION, SOUNDS }
 private enum class CaptionEngine { ANDROID_SYSTEM, SHERPA_T_ONE }
 
 @Composable
@@ -75,6 +75,13 @@ fun GlazouhApp() {
     var ttsReady by remember { mutableStateOf(false) }
     var diarizationRecording by remember { mutableStateOf(false) }
     var speakerSegments by remember { mutableStateOf(emptyList<SpeakerSegment>()) }
+    var soundMonitoring by remember { mutableStateOf(false) }
+    var soundEvents by remember { mutableStateOf(emptyList<SoundEvent>()) }
+
+    val soundMonitor = remember(context) { SoundEventMonitor(context) }
+    DisposableEffect(soundMonitor) {
+        onDispose { soundMonitor.destroy() }
+    }
 
     val diarizationController = remember(context) { SpeakerDiarizationController(context) }
     DisposableEffect(diarizationController) {
@@ -157,6 +164,28 @@ fun GlazouhApp() {
         }
     }
 
+    fun startSoundMonitoring() {
+        scope.launch {
+            try {
+                soundMonitor.start(
+                    onStatus = { message -> scope.launch { status = message } },
+                    onEvents = { events -> scope.launch { soundEvents = events } }
+                )
+                soundMonitoring = true
+            } catch (error: Exception) {
+                soundMonitoring = false
+                status = error.localizedMessage ?: "Не удалось запустить распознавание звуков."
+            }
+        }
+    }
+
+    val soundPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startSoundMonitoring()
+        else status = "Для распознавания звуков нужно разрешение на микрофон."
+    }
+
     val diarizationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -212,6 +241,12 @@ fun GlazouhApp() {
                             LargeActionButton("Разделить собеседников · офлайн") {
                                 speakerSegments = emptyList()
                                 mode = MainMode.DIARIZATION
+                            }
+                        }
+                        if (BuildConfig.SHERPA_ENABLED) {
+                            LargeActionButton("Распознавать окружающие звуки · офлайн") {
+                                soundEvents = emptyList()
+                                mode = MainMode.SOUNDS
                             }
                         }
                         Text(
@@ -365,6 +400,52 @@ fun GlazouhApp() {
                         }
                         Text(
                             "Номера обозначают только акустически похожие голосовые фрагменты. Это не распознавание личности; результат может ошибаться, особенно при перебиваниях, шуме и похожих голосах.",
+                            color = Color(0xFFFFD166),
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    MainMode.SOUNDS -> {
+                        LargeActionButton("Назад") {
+                            soundMonitor.stop()
+                            soundMonitoring = false
+                            mode = MainMode.HOME
+                        }
+                        Text(
+                            "YAMNet анализирует звук с микрофона прямо на телефоне и распознаёт до 521 категорий: сирены, звонки, лай, стук, дождь, речь и другие события.",
+                            fontSize = 17.sp
+                        )
+                        Text(
+                            "При первом запуске скачивается модель около 4 МБ. После загрузки интернет не нужен. Результаты — оценки модели, а не гарантированно верные определения.",
+                            fontSize = 15.sp
+                        )
+                        if (!soundMonitoring) {
+                            LargeActionButton("Начать распознавание звуков") {
+                                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                if (granted) startSoundMonitoring()
+                                else soundPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        } else {
+                            LargeActionButton("Остановить распознавание") {
+                                soundMonitor.stop()
+                                soundMonitoring = false
+                                status = "Распознавание звуков остановлено."
+                            }
+                        }
+                        Text("Последние распознанные звуки", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                        if (soundEvents.isEmpty()) {
+                            Text("Пока нет уверенно распознанных событий.", fontSize = 18.sp)
+                        } else {
+                            soundEvents.forEach { event ->
+                                Text(
+                                    event.label + " · оценка модели " + String.format(Locale.US, "%.2f", event.score),
+                                    fontSize = 20.sp,
+                                    modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
+                                )
+                            }
+                        }
+                        Text(
+                            "Это вспомогательная классификация окружающих звуков. Она может пропустить реальный сигнал тревоги или ошибочно определить звук; не используйте её как единственную систему оповещения.",
                             color = Color(0xFFFFD166),
                             fontSize = 15.sp
                         )
