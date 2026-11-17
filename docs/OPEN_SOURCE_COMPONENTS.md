@@ -48,7 +48,7 @@ Keep the app native Kotlin/Compose and add optional, separately loaded on-device
 - MediaPipe Android Object Detector API: https://developers.google.com/edge/mediapipe/solutions/vision/object_detector
 - MediaPipe Tasks setup and model loading: https://developers.google.com/edge/mediapipe/solutions/setup_android
 - EfficientDet-Lite model files / hashes and model license notes: https://github.com/hugocornellier/object_detection
-- sherpa-onnx Android speaker diarization: https://github.com/k2-fsa/sherpa-onnx/tree/master/android/SherpaOnnxSpeakerDiarization
+- sherpa-onnx Kotlin speaker diarization API: https://github.com/k2-fsa/sherpa-onnx/blob/v2.0.1/kotlin-api-examples/test_offline_speaker_diarization.kt\n- sherpa-onnx speaker diarization models and model-size notes: https://k2-fsa.github.io/sherpa/onnx/speaker-diarization/models.html\n- pyannote segmentation model archive SHA-256: https://huggingface.co/onemira/pyannote-segmentation-3.0-onnx\n- 3D-Speaker embedding model hash and Apache-2.0 provenance: https://huggingface.co/onemira/eres2net-base-3dspeaker-onnx
 - PaddleOCR Android deployment: https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/inference_deployment/cross_platform/android_deployment.en.md
 - PaddleOCR multilingual PP-OCRv5 model language matrix: https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.en.md
 - Microsoft BankNote-Net dataset and license notes: https://github.com/microsoft/banknote-net
