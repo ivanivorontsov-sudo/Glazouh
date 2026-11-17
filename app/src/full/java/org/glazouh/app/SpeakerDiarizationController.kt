@@ -118,7 +118,13 @@ class SpeakerDiarizationController(context: Context) {
             }
             worker?.join(5_000)
             check(worker?.isAlive != true) { "Запись ещё останавливается. Попробуйте снова через секунду." }
-            recordingFailure?.let { throw IOException(it) }
+            recordingFailure?.let { failure ->
+                synchronized(samplesLock) {
+                    samples.fill(0)
+                    sampleCount = 0
+                }
+                throw IOException(failure)
+            }
             val captured: ShortArray
             val wasTruncated: Boolean
             synchronized(samplesLock) {
