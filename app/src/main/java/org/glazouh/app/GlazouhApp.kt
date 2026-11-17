@@ -301,14 +301,14 @@ fun GlazouhApp() {
                             }
                             partialCaption = ""
                             status = if (captionEngine == CaptionEngine.SHERPA_T_ONE) {
-                                "Выбран русский движок T-one. При первом запуске загрузится модель около 138 МБ."
+                                "Выбран русский движок T-one. При первом запуске загрузится модель около 144 МБ."
                             } else {
                                 "Выбран системный локальный движок Android."
                             }
                         }
                         Text(
                             if (captionEngine == CaptionEngine.SHERPA_T_ONE) {
-                                "T-one распознаёт русскую речь локально. При первом запуске требуется скачать модель около 138 МБ; после загрузки интернет не нужен. Модель обучена преимущественно на телефонной речи."
+                                "T-one распознаёт русскую речь локально. При первом запуске требуется скачать модель около 144 МБ; после загрузки интернет не нужен. Модель обучена преимущественно на телефонной речи."
                             } else {
                                 "Речь распознаётся системным офлайн-сервисом Android. Если на телефоне нет локальной модели выбранного языка, режим не запустится."
                             },
@@ -322,6 +322,7 @@ fun GlazouhApp() {
                             }
                         ) {
                             captionController.stop()
+                            sherpaCaptionController.stop()
                             captionLanguage = if (captionLanguage == "ru-RU") "en-US" else "ru-RU"
                             partialCaption = ""
                             status = if (captionLanguage == "ru-RU") {

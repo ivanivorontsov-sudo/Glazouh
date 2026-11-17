@@ -56,8 +56,13 @@ class SherpaRussianCaptionController(context: Context) {
             return@withContext
         }
 
+        worker?.let { previous ->
+            if (previous.isAlive) previous.join(1_000)
+            check(!previous.isAlive) { "Предыдущее распознавание ещё завершает работу." }
+        }
         cancelRequested.set(false)
         var recognizer: OnlineRecognizer? = null
+        var stream: com.k2fsa.sherpa.onnx.OnlineStream? = null
         var recorder: AudioRecord? = null
         try {
             report(onStatus, "Проверяю русскую офлайн-модель T-one…")
@@ -71,7 +76,7 @@ class SherpaRussianCaptionController(context: Context) {
                 numThreads = 2,
                 provider = "cpu"
             )
-            recognizer = OnlineRecognizer(
+            val activeRecognizer = OnlineRecognizer(
                 config = OnlineRecognizerConfig(
                     featConfig = FeatureConfig(sampleRate = MODEL_SAMPLE_RATE, featureDim = 80),
                     modelConfig = modelConfig,
@@ -83,7 +88,9 @@ class SherpaRussianCaptionController(context: Context) {
                     enableEndpoint = true
                 )
             )
-            val stream = recognizer.createStream()
+            recognizer = activeRecognizer
+            val activeStream = activeRecognizer.createStream()
+            stream = activeStream
 
             val minBufferBytes = AudioRecord.getMinBufferSize(
                 INPUT_SAMPLE_RATE,
@@ -93,30 +100,29 @@ class SherpaRussianCaptionController(context: Context) {
             check(minBufferBytes > 0) {
                 "Телефон не поддерживает выбранный формат записи микрофона."
             }
-            recorder = AudioRecord(
+            val activeRecorder = AudioRecord(
                 MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 INPUT_SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
                 maxOf(minBufferBytes * 2, INPUT_BUFFER_SAMPLES * 2 * 2)
             )
-            check(recorder.state == AudioRecord.STATE_INITIALIZED) {
+            recorder = activeRecorder
+            check(activeRecorder.state == AudioRecord.STATE_INITIALIZED) {
                 "Не удалось открыть микрофон для офлайн-распознавания."
             }
             check(!cancelRequested.get()) { "Подготовка остановлена." }
 
-            recorder.startRecording()
-            check(recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+            activeRecorder.startRecording()
+            check(activeRecorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                 "Не удалось начать запись с микрофона."
             }
             running.set(true)
-            activeRecorder = recorder
+            this.activeRecorder = activeRecorder
 
-            val currentRecognizer = recognizer
-            val currentRecorder = recorder
             val thread = Thread(
                 {
-                    runRecognitionLoop(currentRecorder, currentRecognizer, stream, onText, onStatus)
+                    runRecognitionLoop(activeRecorder, activeRecognizer, activeStream, onText, onStatus)
                 },
                 "Glazouh-TOne-ASR"
             ).apply { isDaemon = true }
@@ -125,10 +131,12 @@ class SherpaRussianCaptionController(context: Context) {
             report(onStatus, "Слушаю на устройстве. Русская модель работает без облака.")
             // Ownership of the native recognizer and AudioRecord moved to the worker.
             recognizer = null
+            stream = null
             recorder = null
         } catch (error: Exception) {
             runCatching { recorder?.stop() }
             runCatching { recorder?.release() }
+            runCatching { stream?.release() }
             runCatching { recognizer?.release() }
             running.set(false)
             activeRecorder = null
@@ -169,6 +177,7 @@ class SherpaRussianCaptionController(context: Context) {
     ) {
         val pcm = ShortArray(INPUT_BUFFER_SAMPLES)
         var lastPartial = ""
+        var failureMessage: String? = null
         try {
             while (running.get()) {
                 val count = recorder.read(pcm, 0, pcm.size, AudioRecord.READ_BLOCKING)
@@ -207,7 +216,7 @@ class SherpaRussianCaptionController(context: Context) {
                 reportText(onText, finalText, true)
             }
         } catch (error: Exception) {
-            report(onStatus, error.localizedMessage ?: "Ошибка русской модели распознавания речи.")
+            failureMessage = error.localizedMessage ?: "Ошибка русской модели распознавания речи."
         } finally {
             runCatching {
                 if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop()
@@ -217,8 +226,8 @@ class SherpaRussianCaptionController(context: Context) {
             runCatching { recognizer.release() }
             running.set(false)
             if (activeRecorder === recorder) activeRecorder = null
-            worker = null
-            report(onStatus, "Русские офлайн-субтитры остановлены.")
+            if (worker === Thread.currentThread()) worker = null
+            report(onStatus, failureMessage ?: "Русские офлайн-субтитры остановлены.")
         }
     }
 
@@ -353,7 +362,7 @@ class SherpaRussianCaptionController(context: Context) {
         private const val TOKENS_ASSET = "sherpa-t-one/tokens.txt"
 
         private const val MODEL_URL =
-            "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-t-one-russian-2025-09-08/resolve/main/model.onnx"
+            "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-t-one-russian-2025-09-08/resolve/222f592/model.onnx"
         private const val MODEL_SHA256 =
             "5ded080e2a6c86ecc11bcb0902d77524eb3e8b0844cb0c0754347f5aafb4dabc"
 
