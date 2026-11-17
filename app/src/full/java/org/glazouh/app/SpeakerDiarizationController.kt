@@ -34,6 +34,7 @@ data class SpeakerSegment(
 class SpeakerDiarizationController(context: Context) {
     private val appContext = context.applicationContext
     private val running = AtomicBoolean(false)
+    private val preparing = AtomicBoolean(false)
     @Volatile private var hasRecording = false
     private val samplesLock = Any()
     @Volatile private var recorder: AudioRecord? = null
@@ -44,6 +45,8 @@ class SpeakerDiarizationController(context: Context) {
     @Volatile private var recordingFailure: String? = null
 
     suspend fun start(onStatus: (String) -> Unit) = withContext(Dispatchers.IO) {
+        check(preparing.compareAndSet(false, true)) { "Подготовка записи уже выполняется." }
+        try {
         check(appContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             "Для разделения собеседников нужно разрешение на микрофон."
         }
@@ -111,6 +114,9 @@ class SpeakerDiarizationController(context: Context) {
             runCatching { activeRecorder.release() }
             recorder = null
             throw error
+        }
+        } finally {
+            preparing.set(false)
         }
     }
 
