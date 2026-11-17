@@ -63,8 +63,10 @@ class SoundEventMonitor(context: Context) {
                 .setScoreThreshold(SCORE_THRESHOLD)
                 .setMaxResults(MAX_RESULTS)
                 .setResultListener { result: AudioClassifierResult ->
-                    val events = result.classifications
+                    val events = result.classificationResults
                         .firstOrNull()
+                        ?.classifications
+                        ?.firstOrNull()
                         ?.categories
                         .orEmpty()
                         .map { SoundEvent(SoundEventLabelsRu.translate(it.categoryName), it.score) }
