@@ -146,6 +146,8 @@ dependencies {
     implementation("com.google.mediapipe:tasks-vision:1.2.2")
     // Apache-2.0 offline Russian streaming ASR runtime; downloaded and SHA-256 verified by Gradle.
     "fullImplementation"(files(sherpaOnnxAar))
+    // BZip2/TAR extraction for the hash-pinned offline diarization model bundle.
+    "fullImplementation"("org.apache.commons:commons-compress:1.27.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
