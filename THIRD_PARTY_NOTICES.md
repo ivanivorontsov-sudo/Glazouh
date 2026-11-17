@@ -36,7 +36,7 @@ This file is a convenience notice, not a replacement for the full upstream licen
 - Source: https://github.com/k2-fsa/sherpa-onnx
 - Release: https://github.com/k2-fsa/sherpa-onnx/releases/tag/v2.0.1
 - SHA-256: `a8d09d1d32f3eb8520482c6d3d43fae674681c5b050385967c70a3c2c9bf0ee7`
-- The AAR is downloaded during the Gradle build and verified before use.
+- The AAR is downloaded and SHA-256 verified only while building the Full variant. It is not packaged in the Lite APK.
 
 ## T-one Russian streaming ASR model
 
@@ -46,6 +46,6 @@ This file is a convenience notice, not a replacement for the full upstream licen
 - sherpa-onnx model documentation: https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/t-one-ctc-models.html
 - Model URL: https://huggingface.co/csukuangfj/sherpa-onnx-streaming-t-one-russian-2025-09-08
 - Expected model SHA-256: `5ded080e2a6c86ecc11bcb0902d77524eb3e8b0844cb0c0754347f5aafb4dabc`
-- Model weights are downloaded only after the user explicitly selects T-one captions, kept in app-private storage, and verified before loading.
-- The small token table is included in `app/src/main/assets/sherpa-t-one/tokens.txt` and has its own pinned SHA-256 check.
+- Model weights are downloaded only after the user explicitly selects T-one captions in the Full variant, kept in app-private storage, and verified before loading.
+- The small token table is included in `app/src/full/assets/sherpa-t-one/tokens.txt` and has its own pinned SHA-256 check.
 - T-one is trained primarily for telephony speech; accuracy in noisy outdoor or far-field conditions requires testing. It is not a speaker identity system.
