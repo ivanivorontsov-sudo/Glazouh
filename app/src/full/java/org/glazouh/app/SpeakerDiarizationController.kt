@@ -107,6 +107,7 @@ class SpeakerDiarizationController(context: Context) {
             onStatus("Записываю разговор локально. Максимальная длительность — 3 минуты.")
         } catch (error: Exception) {
             running.set(false)
+            hasRecording = false
             runCatching { activeRecorder.release() }
             recorder = null
             throw error
@@ -200,6 +201,8 @@ class SpeakerDiarizationController(context: Context) {
                 if (active.recordingState == AudioRecord.RECORDSTATE_RECORDING) active.stop()
             }
         }
+        recordingFailure = null
+        truncated = false
         synchronized(samplesLock) {
             samples.fill(0)
             sampleCount = 0
@@ -210,6 +213,7 @@ class SpeakerDiarizationController(context: Context) {
 
     private fun appendSamples(source: ShortArray, count: Int): Boolean {
         synchronized(samplesLock) {
+            if (!running.get()) return false
             val remaining = MAX_SAMPLES - sampleCount
             val accepted = minOf(count, remaining)
             if (accepted <= 0) {
