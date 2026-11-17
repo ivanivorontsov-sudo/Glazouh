@@ -57,7 +57,7 @@ private val GlazouhColors = darkColorScheme(
     error = Color(0xFFFF6B6B)
 )
 
-private enum class MainMode { HOME, READER, CAPTIONS }
+private enum class MainMode { HOME, READER, CAPTIONS, OBJECTS }
 
 @Composable
 fun GlazouhApp() {
@@ -71,6 +71,11 @@ fun GlazouhApp() {
     var partialCaption by remember { mutableStateOf("") }
     var captionLanguage by remember { mutableStateOf("ru-RU") }
     var ttsReady by remember { mutableStateOf(false) }
+
+    val objectDetector = remember(context) { OfflineObjectDetector(context) }
+    DisposableEffect(objectDetector) {
+        onDispose { scope.launch { objectDetector.close() } }
+    }
 
     val tts = remember(context) {
         TextToSpeech(context) { result ->
@@ -140,6 +145,7 @@ fun GlazouhApp() {
                     MainMode.HOME -> {
                         LargeActionButton("Прочитать текст камерой") { mode = MainMode.READER }
                         LargeActionButton("Живые офлайн-субтитры") { mode = MainMode.CAPTIONS }
+                        LargeActionButton("Распознать предметы на фото") { mode = MainMode.OBJECTS }
                         Text(
                             "Камера и распознавание текста работают на телефоне. " +
                                 "При первом запуске потребуется скачать языковые модели.",
@@ -221,6 +227,16 @@ fun GlazouhApp() {
                                 "Не используйте результат как единственное основание для приёма лекарства.",
                             color = Color(0xFFFFD166),
                             fontSize = 15.sp
+                        )
+                    }
+
+                    MainMode.OBJECTS -> {
+                        ObjectDetectionScreen(
+                            detector = objectDetector,
+                            tts = tts,
+                            ttsReady = ttsReady,
+                            onBack = { mode = MainMode.HOME },
+                            onStatus = { status = it }
                         )
                     }
 
