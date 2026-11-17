@@ -40,7 +40,8 @@ Keep the app native Kotlin/Compose and add optional, separately loaded on-device
 3. Benchmark PaddleOCR beside Tesseract on a repeatable Russian/English test set.
 4. Benchmark the opt-in T-one streaming speech engine on clean speech, phone calls, noisy rooms and far-field audio; keep Android system speech as an alternative.
 5. Full now includes an opt-in offline diarization screen for recordings up to 3 minutes. It uses sherpa-onnx Kotlin API with pyannote segmentation and 3D-Speaker embeddings; both model downloads are size-bounded and SHA-256 verified. Output is limited to numbered voice segments, never person names. Real-device accuracy, battery use and memory pressure still require testing.
-6. Full now includes opt-in YAMNet environmental sound classification through MediaPipe Tasks Audio. The model is downloaded on request, SHA-256 checked and run locally. Russian names are provided for common events; scores are model scores, not calibrated probabilities or a safety alarm.\n7. Train a ruble classifier only after reviewing dataset source, class balance, old/new note coverage and independent real-world test images.
+6. Full now includes opt-in YAMNet environmental sound classification through MediaPipe Tasks Audio. The model is downloaded on request, SHA-256 checked and run locally. Russian names are provided for common events; scores are model scores, not calibrated probabilities or a safety alarm.
+7. Train a ruble classifier only after reviewing dataset source, class balance, old/new note coverage and independent real-world test images.
 8. Treat traffic-light analysis as a separate safety-critical research project with conservative state machines, extensive replay tests and outdoor validation.
 
 ## Sources
@@ -58,7 +59,9 @@ Keep the app native Kotlin/Compose and add optional, separately loaded on-device
 - Russian banknote dataset and class list: https://huggingface.co/datasets/Dderedor/kupuri
 - VIA Safe Crosswalk: https://github.com/25-p-project-team-6/VIA-Safe-Crosswalk
 - SightBuddy: https://github.com/DrophouseLtd/SightBuddy
-- SmolVLM model card: https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct\n- MediaPipe Audio Classifier Android guide: https://developers.google.com/edge/mediapipe/solutions/audio/audio_classifier/android\n- YAMNet model and 521 AudioSet labels: https://developers.google.com/edge/mediapipe/solutions/audio/audio_classifier
+- SmolVLM model card: https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct
+- MediaPipe Audio Classifier Android guide: https://developers.google.com/edge/mediapipe/solutions/audio/audio_classifier/android
+- YAMNet model and 521 AudioSet labels: https://developers.google.com/edge/mediapipe/solutions/audio/audio_classifier
 
 
 ## Additional repository audit (17 Nov 2026)
