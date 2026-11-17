@@ -34,6 +34,7 @@ data class SpeakerSegment(
 class SpeakerDiarizationController(context: Context) {
     private val appContext = context.applicationContext
     private val running = AtomicBoolean(false)
+    @Volatile private var hasRecording = false
     private val samplesLock = Any()
     @Volatile private var recorder: AudioRecord? = null
     @Volatile private var worker: Thread? = null
@@ -77,6 +78,7 @@ class SpeakerDiarizationController(context: Context) {
             }
             recorder = activeRecorder
             running.set(true)
+            hasRecording = true
             worker = Thread({
                 val buffer = ShortArray(BUFFER_SAMPLES)
                 try {
@@ -85,7 +87,11 @@ class SpeakerDiarizationController(context: Context) {
                         if (!running.get()) break
                         if (count == AudioRecord.ERROR_DEAD_OBJECT) throw IOException("Микрофон был отключён системой.")
                         if (count < 0) throw IOException("Ошибка чтения микрофона: $count")
-                        appendSamples(buffer, count)
+                        if (appendSamples(buffer, count)) {
+                            running.set(false)
+                            onStatus("Достигнут лимит записи в 3 минуты. Нажмите «Остановить и определить говорящих».")
+                            break
+                        }
                     }
                 } catch (error: Exception) {
                     recordingFailure = error.localizedMessage ?: "Ошибка записи аудио."
@@ -109,7 +115,7 @@ class SpeakerDiarizationController(context: Context) {
 
     suspend fun stopAndAnalyze(onStatus: (String) -> Unit): List<SpeakerSegment> =
         withContext(Dispatchers.IO) {
-            check(running.get() || recordingFailure != null) { "Сейчас нет активной записи." }
+            check(hasRecording) { "Сейчас нет активной записи." }
             running.set(false)
             recorder?.let { active ->
                 runCatching {
@@ -119,6 +125,7 @@ class SpeakerDiarizationController(context: Context) {
             worker?.join(5_000)
             check(worker?.isAlive != true) { "Запись ещё останавливается. Попробуйте снова через секунду." }
             recordingFailure?.let { failure ->
+                hasRecording = false
                 synchronized(samplesLock) {
                     samples.fill(0)
                     sampleCount = 0
@@ -134,6 +141,7 @@ class SpeakerDiarizationController(context: Context) {
                 samples.fill(0)
                 samples = ShortArray(INITIAL_SAMPLES)
             }
+            hasRecording = false
             if (captured.size < SAMPLE_RATE * MIN_SECONDS) {
                 captured.fill(0)
                 throw IOException("Запись слишком короткая. Нужно хотя бы $MIN_SECONDS секунд.")
@@ -186,6 +194,7 @@ class SpeakerDiarizationController(context: Context) {
 
     fun cancel() {
         running.set(false)
+        hasRecording = false
         recorder?.let { active ->
             runCatching {
                 if (active.recordingState == AudioRecord.RECORDSTATE_RECORDING) active.stop()
@@ -199,13 +208,13 @@ class SpeakerDiarizationController(context: Context) {
 
     fun destroy() = cancel()
 
-    private fun appendSamples(source: ShortArray, count: Int) {
+    private fun appendSamples(source: ShortArray, count: Int): Boolean {
         synchronized(samplesLock) {
             val remaining = MAX_SAMPLES - sampleCount
             val accepted = minOf(count, remaining)
             if (accepted <= 0) {
                 truncated = true
-                return
+                return true
             }
             if (sampleCount + accepted > samples.size) {
                 var newSize = samples.size
@@ -215,6 +224,7 @@ class SpeakerDiarizationController(context: Context) {
             source.copyInto(samples, sampleCount, 0, accepted)
             sampleCount += accepted
             if (accepted < count) truncated = true
+            return sampleCount >= MAX_SAMPLES
         }
     }
 
