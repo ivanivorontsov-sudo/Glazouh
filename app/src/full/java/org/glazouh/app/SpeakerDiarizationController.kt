@@ -222,12 +222,22 @@ class SpeakerDiarizationController(context: Context) {
         val directory = File(appContext.filesDir, "speech/speaker-diarization")
         check(directory.exists() || directory.mkdirs()) { "Не удалось создать папку моделей." }
         val segmentation = File(directory, SEGMENTATION_FILENAME)
+        val segmentationManifest = File(directory, SEGMENTATION_MANIFEST)
         val embedding = File(directory, EMBEDDING_FILENAME)
-        if (!verified(segmentation, SEGMENTATION_SHA, SEGMENTATION_BYTES)) {
+        if (!verifiedExtractedSegmentation(segmentation, segmentationManifest)) {
             onStatus("Скачиваю модель анализа голосовых фрагментов (~6,6 МБ)…")
             val archive = File(directory, "segmentation.tar.bz2")
             downloadVerified(SEGMENTATION_URL, archive, SEGMENTATION_SHA, SEGMENTATION_BYTES, SEGMENTATION_BYTES)
-            try { extractSegmentation(archive, segmentation) } finally { archive.delete() }
+            try {
+                extractSegmentation(archive, segmentation)
+                val manifestContent = SEGMENTATION_SHA + "\n" + segmentation.length() + "\n" + sha256(segmentation)
+                val manifestPart = File(directory, SEGMENTATION_MANIFEST + ".part")
+                manifestPart.writeText(manifestContent)
+                if (segmentationManifest.exists()) segmentationManifest.delete()
+                check(manifestPart.renameTo(segmentationManifest)) { "Не удалось сохранить контрольную сумму модели сегментации." }
+            } finally {
+                archive.delete()
+            }
         }
         if (!verified(embedding, EMBEDDING_SHA, EMBEDDING_BYTES)) {
             onStatus("Скачиваю модель голосовых признаков (~39,6 МБ)…")
@@ -268,6 +278,7 @@ class SpeakerDiarizationController(context: Context) {
             check(found && temporary.isFile && temporary.length() > 0) {
                 "В архиве не найдена ожидаемая модель сегментации."
             }
+            if (target.exists()) target.delete()
             check(temporary.renameTo(target)) { "Не удалось сохранить модель сегментации." }
         } catch (error: Exception) {
             temporary.delete()
@@ -278,6 +289,17 @@ class SpeakerDiarizationController(context: Context) {
     private fun verified(file: File, sha: String, expectedBytes: Long): Boolean =
         file.isFile && file.length() == expectedBytes &&
             runCatching { sha256(file) == sha }.getOrDefault(false)
+
+    private fun verifiedExtractedSegmentation(model: File, manifest: File): Boolean {
+        if (!model.isFile || model.length() !in 1..10_000_000 || !manifest.isFile) return false
+        return runCatching {
+            val fields = manifest.readLines()
+            fields.size == 3 &&
+                fields[0] == SEGMENTATION_SHA &&
+                fields[1].toLong() == model.length() &&
+                fields[2] == sha256(model)
+        }.getOrDefault(false)
+    }
 
     private fun downloadVerified(
         url: String, target: File, expectedSha: String, minBytes: Long, maxBytes: Long
@@ -344,6 +366,7 @@ class SpeakerDiarizationController(context: Context) {
         private const val MAX_SAMPLES = SAMPLE_RATE * MAX_SECONDS
         private const val INITIAL_SAMPLES = SAMPLE_RATE * 10
         private const val SEGMENTATION_FILENAME = "pyannote-segmentation.onnx"
+        private const val SEGMENTATION_MANIFEST = "pyannote-segmentation.manifest"
         private const val SEGMENTATION_BYTES = 6_958_444L
         private const val SEGMENTATION_SHA = "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488"
         private const val SEGMENTATION_URL =
