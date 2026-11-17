@@ -1,0 +1,57 @@
+# Open-source component research for ГлазУх
+
+Research snapshot: 2026-11-17. This is a component-selection record, not a claim that every capability below is already integrated or validated.
+
+## Recommended architecture
+
+Keep the app native Kotlin/Compose and add optional, separately loaded on-device modules. Keep Tesseract OCR as the known-good baseline until alternatives pass side-by-side tests on Russian print, receipts, medicine packaging, low light, blur and perspective distortion.
+
+| Need | Candidate | License / fit | Decision |
+|---|---|---|---|
+| General object detection | [MediaPipe Tasks Vision](https://github.com/google-ai-edge/mediapipe) + [EfficientDet-Lite0](https://developers.google.com/edge/mediapipe/solutions/vision/object_detector) | MediaPipe Tasks: Apache-2.0. The EfficientDet-Lite0 model asset used here is separately attributed under Apache-2.0. Android Kotlin API; 80 COCO categories. | First integrated vision module. Start with a single still image, then benchmark CameraX streaming. |
+| Russian scene objects | [SightBuddy](https://github.com/DrophouseLtd/SightBuddy) | App code MIT. Third-party runtimes/models keep their own licenses. Active Android/Compose reference with MediaPipe Tasks, sherpa-onnx, model hashing and TalkBack-oriented UX. | Study architecture and tests; do not copy whole app or assume every bundled model is MIT. |
+| Offline speaker diarization and speech | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | Runtime Apache-2.0; Android Kotlin examples and dedicated diarization APK/source. Each downloadable speech model still needs its own license review. | Best candidate for replacing the current system SpeechRecognizer in a later opt-in module. |
+| Russian OCR alternative | [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) | Apache-2.0. Official Android sample separates an SDK/AAR from the app and uses ONNX Runtime. PP-OCRv5 Cyrillic models include Russian. | Build an optional benchmark adapter; don't remove Tesseract until tests prove a measurable gain. |
+| Ruble recognition | [Russian Banknote Dataset](https://huggingface.co/datasets/Dderedor/kupuri) | Dataset card says MIT. 949 images, 9 nominal values (5–5000 RUB), including multiple banknote generations. | Useful seed dataset, but too small for reliable real-world release claims without collecting permissioned test images and measuring false predictions. |
+| Multi-currency research | [Microsoft BankNote-Net](https://github.com/microsoft/banknote-net) | Repository code is MIT; dataset of embeddings is CDLA-Permissive-2.0. It contains 24,816 embeddings spanning 17 currencies / 112 denominations; its encoder is MobileNetV2-based. | Useful research baseline. Do not treat the dataset/embeddings as MIT just because the repository code has an MIT file. |
+| Traffic-light prototype | [VIA Safe Crosswalk](https://github.com/25-p-project-team-6/VIA-Safe-Crosswalk) | Android prototype, MIT application code; model/data files have separate terms. Korean signal context, TFLite/LiteRT, state stabilisation and conservative policy. | Study state-machine tests only. Do not reuse Korean model assumptions for Russian/European traffic or issue "GO" guidance. |
+| Small vision-language model | [SmolVLM-256M](https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct) | Model card states Apache-2.0 for checkpoints. More practical to benchmark as a later opt-in download; mobile runtime, latency, memory and Russian response quality still need validation. | Research track, not a default dependency. |
+| Offline scanner / document geometry | [MakeACopy](https://github.com/egdels/makeacopy), [DocScannerPro](https://github.com/REBEL-ROOT/DocScannerPro) | Both describe offline OCR / scanning flows; application and model/dependency licenses must be audited individually. | Useful reference for page-edge detection, perspective correction, OCR review and export. |
+
+## License and provenance rules
+
+1. The license of an app repository does not automatically cover its model files, training data, fonts, audio, native libraries or downloaded weights.
+2. Preserve upstream LICENSE/NOTICE files and record the exact model revision, URL and SHA-256 before distributing a model.
+3. Never download arbitrary serialized Python/Keras/HDF5 model files and load them as trusted code. Prefer audited TFLite, ONNX or MediaPipe task assets with pinned hashes.
+4. For model downloads, use HTTPS, app-private storage, temporary files, size bounds, hash verification and atomic rename. A failed hash must fail closed.
+5. Optional models must be downloadable only on request and deletable by the user; do not make large models part of the base APK unless there is a strong reason.
+
+## Safety boundaries
+
+- COCO's "traffic light" category only detects an object that resembles a traffic light. It does not establish which signal is lit, whether it applies to the pedestrian, whether the crossing is occupied, or whether crossing is safe.
+- Banknote classification identifies a likely denomination, not authenticity, value condition or legal tender status. Low confidence and unknown designs must produce "не удалось определить", never a guessed value.
+- Speaker diarization labels voice segments (for example "speaker 1" / "speaker 2"); it does not identify a real person.
+- Image captioning can hallucinate. All outputs remain assistive hints, not sole evidence for medical, financial or road-safety decisions.
+
+## Integration sequence
+
+1. Complete and test the still-image COCO object detector with verified model download.
+2. Add bilingual (Russian/English) object labels and accessibility tests.
+3. Benchmark PaddleOCR beside Tesseract on a repeatable Russian/English test set.
+4. Prototype sherpa-onnx transcription + diarization behind a user-selected offline model download.
+5. Train a ruble classifier only after reviewing dataset source, class balance, old/new note coverage and independent real-world test images.
+6. Treat traffic-light analysis as a separate safety-critical research project with conservative state machines, extensive replay tests and outdoor validation.
+
+## Sources
+
+- MediaPipe Android Object Detector API: https://developers.google.com/edge/mediapipe/solutions/vision/object_detector
+- MediaPipe Tasks setup and model loading: https://developers.google.com/edge/mediapipe/solutions/setup_android
+- EfficientDet-Lite model files / hashes and model license notes: https://github.com/hugocornellier/object_detection
+- sherpa-onnx Android speaker diarization: https://github.com/k2-fsa/sherpa-onnx/tree/master/android/SherpaOnnxSpeakerDiarization
+- PaddleOCR Android deployment: https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/inference_deployment/cross_platform/android_deployment.en.md
+- PaddleOCR multilingual PP-OCRv5 model language matrix: https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.en.md
+- Microsoft BankNote-Net dataset and license notes: https://github.com/microsoft/banknote-net
+- Russian banknote dataset and class list: https://huggingface.co/datasets/Dderedor/kupuri
+- VIA Safe Crosswalk: https://github.com/25-p-project-team-6/VIA-Safe-Crosswalk
+- SightBuddy: https://github.com/DrophouseLtd/SightBuddy
+- SmolVLM model card: https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct
