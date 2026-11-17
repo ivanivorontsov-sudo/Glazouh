@@ -57,7 +57,7 @@
 - Модели [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast).
 - Android TextToSpeech.
 - Android on-device SpeechRecognizer.
-- Два варианта сборки: Lite (без sherpa-onnx runtime) и Full (с опциональным русским T-one).
+- Два варианта сборки: Lite (без sherpa-onnx runtime) и Full (русский T-one ASR и офлайн-разделение собеседников).
 - GitHub Actions для сборки APK.
 
 Для будущей офлайн-диаризации и самостоятельного распознавания речи рассматривается [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx): проект имеет Android-поддержку ASR, TTS и speaker diarization. Это пока планируемый адаптер, а не включённая функция ГлазУха.
