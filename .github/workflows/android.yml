@@ -48,3 +48,44 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+  publish-alpha:
+    if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'Prepare Glazouh alpha release 0.1.0-alpha.1' }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested APK
+        uses: actions/download-artifact@v4
+        with:
+          name: Glazouh-debug
+          path: dist
+
+      - name: Publish GitHub pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-alpha.1
+          target_commitish: ${{ github.sha }}
+          name: ГлазУх v0.1.0-alpha.1
+          body: |
+            ## ГлазУх 0.1.0-alpha.1
+
+            Первая альфа-сборка Android-приложения.
+
+            ### Уже работает в проекте
+            - Камера на CameraX и чтение текста рус/английский через локальный Tesseract OCR.
+            - Озвучивание распознанного текста через Android TextToSpeech.
+            - Экран офлайн-субтитров через системный on-device SpeechRecognizer (Android 12+, если локальный движок доступен).
+            - Высококонтрастный интерфейс с крупными элементами управления.
+
+            ### Важно
+            - Это ранняя альфа, APK подписан временным Android debug-ключом CI.
+            - Не предназначен для установки поверх будущих сборок или для публикации в магазинах.
+            - Распознавание лекарств как медицинских данных, банкнот, светофоров, дорожной безопасности и говорящих по личности пока не реализовано.
+            - OCR и распознавание речи могут ошибаться; не используйте результат как единственное основание для медицинских или дорожных решений.
+          files: dist/*.apk
+          prerelease: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
