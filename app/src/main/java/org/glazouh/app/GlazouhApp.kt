@@ -157,7 +157,22 @@ fun GlazouhApp() {
         }
     }
 
-    val diarizationPermissionLauncher = rememberLauncherForActivityResult(\n        ActivityResultContracts.RequestPermission()\n    ) { granted ->\n        if (granted) {\n            scope.launch {\n                try {\n                    diarizationController.start { message -> scope.launch { status = message; diarizationRecording = true } }\n                } catch (error: Exception) {\n                    diarizationRecording = false\n                    status = error.localizedMessage ?: "Не удалось начать запись разговора."\n                }\n            }\n        } else status = "Для разделения собеседников нужно разрешение на микрофон."\n    }\n\n    val micPermissionLauncher = rememberLauncherForActivityResult(
+    val diarizationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            scope.launch {
+                try {
+                    diarizationController.start { message -> scope.launch { status = message; diarizationRecording = true } }
+                } catch (error: Exception) {
+                    diarizationRecording = false
+                    status = error.localizedMessage ?: "Не удалось начать запись разговора."
+                }
+            }
+        } else status = "Для разделения собеседников нужно разрешение на микрофон."
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) startSelectedCaptionEngine()
@@ -191,7 +206,13 @@ fun GlazouhApp() {
                     MainMode.HOME -> {
                         LargeActionButton("Прочитать текст камерой") { mode = MainMode.READER }
                         LargeActionButton("Живые офлайн-субтитры") { mode = MainMode.CAPTIONS }
-                        LargeActionButton("Распознать предметы на фото") { mode = MainMode.OBJECTS }\n                        if (BuildConfig.SHERPA_ENABLED) {\n                            LargeActionButton("Разделить собеседников · офлайн") {\n                                speakerSegments = emptyList()\n                                mode = MainMode.DIARIZATION\n                            }\n                        }
+                        LargeActionButton("Распознать предметы на фото") { mode = MainMode.OBJECTS }
+                        if (BuildConfig.SHERPA_ENABLED) {
+                            LargeActionButton("Разделить собеседников · офлайн") {
+                                speakerSegments = emptyList()
+                                mode = MainMode.DIARIZATION
+                            }
+                        }
                         Text(
                             "Камера и распознавание текста работают на телефоне. " +
                                 "При первом запуске потребуется скачать языковые модели.",
@@ -285,7 +306,69 @@ fun GlazouhApp() {
                         )
                     }
 
-                    MainMode.DIARIZATION -> {\n                        LargeActionButton("Назад") {\n                            diarizationController.cancel()\n                            diarizationRecording = false\n                            mode = MainMode.HOME\n                        }\n                        Text(\n                            "Запишите короткий фрагмент разговора. После остановки ГлазУх локально выделит голосовые отрезки и подпишет их нейтральными номерами. Запись не сохраняется в файл и удаляется из памяти после анализа.",\n                            fontSize = 17.sp\n                        )\n                        Text(\n                            "Первый запуск скачает две модели (примерно 47 МБ суммарно). Анализ выполняется на телефоне; поддерживается запись до 3 минут.",\n                            fontSize = 15.sp\n                        )\n                        if (!diarizationRecording) {\n                            LargeActionButton("Начать запись разговора") {\n                                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED\n                                if (granted) {\n                                    scope.launch {\n                                        try {\n                                            diarizationController.start { message -> scope.launch { status = message; diarizationRecording = true } }\n                                        } catch (error: Exception) {\n                                            diarizationRecording = false\n                                            status = error.localizedMessage ?: "Не удалось начать запись."\n                                        }\n                                    }\n                                } else diarizationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)\n                            }\n                        } else {\n                            LargeActionButton("Остановить и определить говорящих") {\n                                scope.launch {\n                                    try {\n                                        speakerSegments = diarizationController.stopAndAnalyze { message -> scope.launch { status = message } }\n                                    } catch (error: Exception) {\n                                        status = error.localizedMessage ?: "Не удалось проанализировать запись."\n                                    } finally {\n                                        diarizationRecording = false\n                                    }\n                                }\n                            }\n                        }\n                        if (speakerSegments.isNotEmpty()) {\n                            Text("Найденные голосовые фрагменты", fontSize = 21.sp, fontWeight = FontWeight.Bold)\n                            speakerSegments.forEach { segment ->\n                                val start = String.format(Locale.US, "%.1f", segment.startSeconds)\n                                val end = String.format(Locale.US, "%.1f", segment.endSeconds)\n                                Text(\n                                    "Собеседник ${segment.speakerIndex + 1} · $start–$end сек.",\n                                    fontSize = 19.sp,\n                                    modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }\n                                )\n                            }\n                        } else if (!diarizationRecording) {\n                            Text("Результаты появятся здесь после анализа записи.", fontSize = 17.sp)\n                        }\n                        Text(\n                            "Номера обозначают только акустически похожие голосовые фрагменты. Это не распознавание личности; результат может ошибаться, особенно при перебиваниях, шуме и похожих голосах.",\n                            color = Color(0xFFFFD166),\n                            fontSize = 15.sp\n                        )\n                    }\n\n                    MainMode.CAPTIONS -> {
+                    MainMode.DIARIZATION -> {
+                        LargeActionButton("Назад") {
+                            diarizationController.cancel()
+                            diarizationRecording = false
+                            mode = MainMode.HOME
+                        }
+                        Text(
+                            "Запишите короткий фрагмент разговора. После остановки ГлазУх локально выделит голосовые отрезки и подпишет их нейтральными номерами. Запись не сохраняется в файл и удаляется из памяти после анализа.",
+                            fontSize = 17.sp
+                        )
+                        Text(
+                            "Первый запуск скачает две модели (примерно 47 МБ суммарно). Анализ выполняется на телефоне; поддерживается запись до 3 минут.",
+                            fontSize = 15.sp
+                        )
+                        if (!diarizationRecording) {
+                            LargeActionButton("Начать запись разговора") {
+                                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                if (granted) {
+                                    scope.launch {
+                                        try {
+                                            diarizationController.start { message -> scope.launch { status = message; diarizationRecording = true } }
+                                        } catch (error: Exception) {
+                                            diarizationRecording = false
+                                            status = error.localizedMessage ?: "Не удалось начать запись."
+                                        }
+                                    }
+                                } else diarizationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        } else {
+                            LargeActionButton("Остановить и определить говорящих") {
+                                scope.launch {
+                                    try {
+                                        speakerSegments = diarizationController.stopAndAnalyze { message -> scope.launch { status = message } }
+                                    } catch (error: Exception) {
+                                        status = error.localizedMessage ?: "Не удалось проанализировать запись."
+                                    } finally {
+                                        diarizationRecording = false
+                                    }
+                                }
+                            }
+                        }
+                        if (speakerSegments.isNotEmpty()) {
+                            Text("Найденные голосовые фрагменты", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                            speakerSegments.forEach { segment ->
+                                val start = String.format(Locale.US, "%.1f", segment.startSeconds)
+                                val end = String.format(Locale.US, "%.1f", segment.endSeconds)
+                                Text(
+                                    "Собеседник ${segment.speakerIndex + 1} · $start–$end сек.",
+                                    fontSize = 19.sp,
+                                    modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
+                                )
+                            }
+                        } else if (!diarizationRecording) {
+                            Text("Результаты появятся здесь после анализа записи.", fontSize = 17.sp)
+                        }
+                        Text(
+                            "Номера обозначают только акустически похожие голосовые фрагменты. Это не распознавание личности; результат может ошибаться, особенно при перебиваниях, шуме и похожих голосах.",
+                            color = Color(0xFFFFD166),
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    MainMode.CAPTIONS -> {
                         LargeActionButton("Назад") {
                             captionController.stop()
                             sherpaCaptionController.stop()
