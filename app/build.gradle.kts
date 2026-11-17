@@ -148,6 +148,7 @@ dependencies {
     "fullImplementation"(files(sherpaOnnxAar))
     // BZip2/TAR extraction for the hash-pinned offline diarization model bundle.
     "fullImplementation"("org.apache.commons:commons-compress:1.27.1")
+    "fullImplementation"("com.google.mediapipe:tasks-audio:1.2.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
