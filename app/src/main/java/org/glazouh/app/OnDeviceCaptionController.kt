@@ -42,7 +42,7 @@ class OnDeviceCaptionController(
             startListeningSafely()
         } catch (error: Exception) {
             isRunning = false
-            onStatus("Не удалось запустить офлайн-распознавание: \${error.localizedMessage ?: "ошибка"}")
+            onStatus("Не удалось запустить офлайн-распознавание: ${error.localizedMessage ?: "ошибка"}")
             destroyRecognizer()
         }
     }
@@ -69,7 +69,7 @@ class OnDeviceCaptionController(
         }
         runCatching { current.startListening(intent) }
             .onFailure {
-                onStatus("Офлайн-распознавание не запустилось: \${it.localizedMessage ?: "ошибка"}")
+                onStatus("Офлайн-распознавание не запустилось: ${it.localizedMessage ?: "ошибка"}")
             }
     }
 
