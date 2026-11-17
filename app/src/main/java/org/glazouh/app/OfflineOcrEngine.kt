@@ -22,3 +22,4 @@ class OfflineOcrEngine(private val context: Context) {
                 tesseract.recycle()
             }
         }
+}
