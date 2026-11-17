@@ -47,10 +47,12 @@ class DetectionAnnouncementGateTest {
     fun globalRateLimitPreventsRapidSpeechForDifferentObjects() {
         val gate = DetectionAnnouncementGate()
 
-        repeat(3) { gate.update(listOf("person" to 0.9f), 1_000L + it * 1_000L) }
-        assertEquals(listOf("person"), gate.update(listOf("person" to 0.9f), 4_000))
-        repeat(3) { gate.update(listOf("chair" to 0.9f), 4_500L + it * 100L) }
+        assertTrue(gate.update(listOf("person" to 0.9f), 1_000).isEmpty())
+        assertTrue(gate.update(listOf("person" to 0.9f), 2_000).isEmpty())
+        assertEquals(listOf("person"), gate.update(listOf("person" to 0.9f), 3_000))
+
+        repeat(3) { gate.update(listOf("chair" to 0.9f), 4_000L + it * 100L) }
         assertTrue(gate.update(listOf("chair" to 0.9f), 5_000).isEmpty())
-        assertEquals(listOf("chair"), gate.update(listOf("chair" to 0.9f), 7_000))
+        assertEquals(listOf("chair"), gate.update(listOf("chair" to 0.9f), 5_500))
     }
 }
