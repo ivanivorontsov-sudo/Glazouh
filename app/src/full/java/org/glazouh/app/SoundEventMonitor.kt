@@ -42,11 +42,13 @@ class SoundEventMonitor(context: Context) {
     ) = withContext(Dispatchers.IO) {
         check(preparing.compareAndSet(false, true)) { "Подготовка распознавания звуков уже выполняется." }
         cancelRequested.set(false)
+        var ownsSession = false
         try {
             check(appContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 "Для распознавания окружающих звуков нужно разрешение на микрофон."
             }
             check(active.compareAndSet(false, true)) { "Распознавание звуков уже запущено." }
+            ownsSession = true
             onStatus("Проверяю офлайн-модель YAMNet…")
             val model = ensureModel()
             check(!cancelRequested.get()) { "Запуск распознавания звуков отменён." }
@@ -112,8 +114,10 @@ class SoundEventMonitor(context: Context) {
             }
             onStatus("Слушаю окружающие звуки локально. YAMNet распознаёт 521 категорию.")
         } catch (error: Exception) {
-            active.set(false)
-            stopInternal()
+            if (ownsSession) {
+                active.set(false)
+                stopInternal()
+            }
             throw error
         } finally {
             preparing.set(false)
