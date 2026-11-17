@@ -58,6 +58,7 @@ private val GlazouhColors = darkColorScheme(
 )
 
 private enum class MainMode { HOME, READER, CAPTIONS, OBJECTS }
+private enum class CaptionEngine { ANDROID_SYSTEM, SHERPA_T_ONE }
 
 @Composable
 fun GlazouhApp() {
@@ -70,6 +71,7 @@ fun GlazouhApp() {
     var transcript by remember { mutableStateOf(emptyList<String>()) }
     var partialCaption by remember { mutableStateOf("") }
     var captionLanguage by remember { mutableStateOf("ru-RU") }
+    var captionEngine by remember { mutableStateOf(CaptionEngine.ANDROID_SYSTEM) }
     var ttsReady by remember { mutableStateOf(false) }
 
     val objectDetector = remember(context) { OfflineObjectDetector(context) }
@@ -111,10 +113,47 @@ fun GlazouhApp() {
         onDispose { captionController.destroy() }
     }
 
+    val sherpaCaptionController = remember(context) {
+        SherpaRussianCaptionController(context).also { controller ->
+            // Text and status callbacks are always dispatched to Android's main thread.
+        }
+    }
+    DisposableEffect(sherpaCaptionController) {
+        onDispose { sherpaCaptionController.destroy() }
+    }
+
+    fun startSelectedCaptionEngine() {
+        if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
+            captionController.start(captionLanguage)
+        } else {
+            if (captionLanguage != "ru-RU") {
+                status = "Модель T-one поддерживает русский язык. Выберите русский или системный движок Android."
+                return
+            }
+            scope.launch {
+                try {
+                    sherpaCaptionController.start(
+                        onText = { text, isFinal ->
+                            if (isFinal) {
+                                transcript = (transcript + text).takeLast(30)
+                                partialCaption = ""
+                            } else {
+                                partialCaption = text
+                            }
+                        },
+                        onStatus = { status = it }
+                    )
+                } catch (error: Exception) {
+                    status = error.localizedMessage ?: "Не удалось запустить русскую модель T-one."
+                }
+            }
+        }
+    }
+
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) captionController.start(captionLanguage)
+        if (granted) startSelectedCaptionEngine()
         else status = "Для субтитров нужно разрешение на микрофон."
     }
 
@@ -243,12 +282,37 @@ fun GlazouhApp() {
                     MainMode.CAPTIONS -> {
                         LargeActionButton("Назад") {
                             captionController.stop()
+                            sherpaCaptionController.stop()
                             mode = MainMode.HOME
                         }
+                        LargeActionButton(
+                            if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
+                                "Движок: Android · переключить на T-one"
+                            } else {
+                                "Движок: T-one · переключить на Android"
+                            }
+                        ) {
+                            captionController.stop()
+                            sherpaCaptionController.stop()
+                            captionEngine = if (captionEngine == CaptionEngine.ANDROID_SYSTEM) {
+                                CaptionEngine.SHERPA_T_ONE
+                            } else {
+                                CaptionEngine.ANDROID_SYSTEM
+                            }
+                            partialCaption = ""
+                            status = if (captionEngine == CaptionEngine.SHERPA_T_ONE) {
+                                "Выбран русский движок T-one. При первом запуске загрузится модель около 138 МБ."
+                            } else {
+                                "Выбран системный локальный движок Android."
+                            }
+                        }
                         Text(
-                            "Речь распознаётся системным офлайн-сервисом Android. " +
-                                "Если на устройстве нет локальной модели выбранного языка, режим не запустится.",
-                            fontSize = 17.sp
+                            if (captionEngine == CaptionEngine.SHERPA_T_ONE) {
+                                "T-one распознаёт русскую речь локально. При первом запуске требуется скачать модель около 138 МБ; после загрузки интернет не нужен. Модель обучена преимущественно на телефонной речи."
+                            } else {
+                                "Речь распознаётся системным офлайн-сервисом Android. Если на телефоне нет локальной модели выбранного языка, режим не запустится."
+                            },
+                            fontSize = 16.sp
                         )
                         LargeActionButton(
                             if (captionLanguage == "ru-RU") {
@@ -271,10 +335,13 @@ fun GlazouhApp() {
                                 context,
                                 Manifest.permission.RECORD_AUDIO
                             ) == PackageManager.PERMISSION_GRANTED
-                            if (granted) captionController.start(captionLanguage)
+                            if (granted) startSelectedCaptionEngine()
                             else micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
-                        LargeActionButton("Остановить") { captionController.stop() }
+                        LargeActionButton("Остановить") {
+                            captionController.stop()
+                            sherpaCaptionController.stop()
+                        }
                         LargeActionButton("Очистить стенограмму") {
                             transcript = emptyList()
                             partialCaption = ""

@@ -10,7 +10,7 @@ Keep the app native Kotlin/Compose and add optional, separately loaded on-device
 |---|---|---|---|
 | General object detection | [MediaPipe Tasks Vision](https://github.com/google-ai-edge/mediapipe) + [EfficientDet-Lite0](https://developers.google.com/edge/mediapipe/solutions/vision/object_detector) | MediaPipe Tasks: Apache-2.0. The EfficientDet-Lite0 model asset used here is separately attributed under Apache-2.0. Android Kotlin API; 80 COCO categories. | First integrated vision module. Start with a single still image, then benchmark CameraX streaming. |
 | Russian scene objects | [SightBuddy](https://github.com/DrophouseLtd/SightBuddy) | App code MIT. Third-party runtimes/models keep their own licenses. Active Android/Compose reference with MediaPipe Tasks, sherpa-onnx, model hashing and TalkBack-oriented UX. | Study architecture and tests; do not copy whole app or assume every bundled model is MIT. |
-| Offline speaker diarization and speech | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | Runtime Apache-2.0; Android Kotlin examples and dedicated diarization APK/source. Each downloadable speech model still needs its own license review. | Best candidate for replacing the current system SpeechRecognizer in a later opt-in module. |
+| Offline Russian speech | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) + [T-one Russian streaming model](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/t-one-ctc-models.html) | Runtime Apache-2.0; T-one model Apache-2.0; streaming Kotlin API. T-one expects 8 kHz input and is telephony-domain trained. | Integrated as an opt-in Russian engine; model is downloaded on demand and SHA-256 verified. Outdoor/far-field quality still requires device tests. |
 | Russian OCR alternative | [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) | Apache-2.0. Official Android sample separates an SDK/AAR from the app and uses ONNX Runtime. PP-OCRv5 Cyrillic models include Russian. | Build an optional benchmark adapter; don't remove Tesseract until tests prove a measurable gain. |
 | Ruble recognition | [Russian Banknote Dataset](https://huggingface.co/datasets/Dderedor/kupuri) | Dataset card says MIT. 949 images, 9 nominal values (5–5000 RUB), including multiple banknote generations. | Useful seed dataset, but too small for reliable real-world release claims without collecting permissioned test images and measuring false predictions. |
 | Multi-currency research | [Microsoft BankNote-Net](https://github.com/microsoft/banknote-net) | Repository code is MIT; dataset of embeddings is CDLA-Permissive-2.0. It contains 24,816 embeddings spanning 17 currencies / 112 denominations; its encoder is MobileNetV2-based. | Useful research baseline. Do not treat the dataset/embeddings as MIT just because the repository code has an MIT file. |
@@ -38,9 +38,10 @@ Keep the app native Kotlin/Compose and add optional, separately loaded on-device
 1. Complete and test the still-image COCO object detector with verified model download.
 2. Add bilingual (Russian/English) object labels and accessibility tests.
 3. Benchmark PaddleOCR beside Tesseract on a repeatable Russian/English test set.
-4. Prototype sherpa-onnx transcription + diarization behind a user-selected offline model download.
-5. Train a ruble classifier only after reviewing dataset source, class balance, old/new note coverage and independent real-world test images.
-6. Treat traffic-light analysis as a separate safety-critical research project with conservative state machines, extensive replay tests and outdoor validation.
+4. Benchmark the opt-in T-one streaming speech engine on clean speech, phone calls, noisy rooms and far-field audio; keep Android system speech as an alternative.
+5. Prototype sherpa-onnx speaker diarization only after verifying each segmentation/embedding model license and model hash. Output speaker numbers, never person names.
+6. Train a ruble classifier only after reviewing dataset source, class balance, old/new note coverage and independent real-world test images.
+7. Treat traffic-light analysis as a separate safety-critical research project with conservative state machines, extensive replay tests and outdoor validation.
 
 ## Sources
 

@@ -19,3 +19,6 @@ keystore.properties
 captures/
 .externalNativeBuild/
 .cxx/
+
+# Verified native runtime downloaded during Gradle build
+app/libs/*.aar
