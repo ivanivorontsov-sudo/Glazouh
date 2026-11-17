@@ -28,7 +28,7 @@ class OcrModelStore(context: Context) {
     private fun downloadModel(language: String, target: File) {
         require(language in SUPPORTED_LANGUAGES)
         val url = URL("$MODEL_BASE_URL/$language.traineddata")
-        val temporary = File(target.parentFile, "\${target.name}.part")
+        val temporary = File(target.parentFile, "${target.name}.part")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 45_000
@@ -38,7 +38,7 @@ class OcrModelStore(context: Context) {
         try {
             connection.connect()
             check(connection.responseCode == HttpURLConnection.HTTP_OK) {
-                "Сервер языковой модели ответил: \${connection.responseCode}"
+                "Сервер языковой модели ответил: ${connection.responseCode}"
             }
             val declaredLength = connection.contentLengthLong
             check(declaredLength in MIN_MODEL_BYTES..MAX_MODEL_BYTES) { "Неожиданный размер модели" }
