@@ -163,7 +163,8 @@ fun GlazouhApp() {
         if (granted) {
             scope.launch {
                 try {
-                    diarizationController.start { message -> scope.launch { status = message; diarizationRecording = true } }
+                    diarizationController.start { message -> scope.launch { status = message } }
+                    diarizationRecording = true
                 } catch (error: Exception) {
                     diarizationRecording = false
                     status = error.localizedMessage ?: "Не удалось начать запись разговора."
@@ -326,7 +327,8 @@ fun GlazouhApp() {
                                 if (granted) {
                                     scope.launch {
                                         try {
-                                            diarizationController.start { message -> scope.launch { status = message; diarizationRecording = true } }
+                                            diarizationController.start { message -> scope.launch { status = message } }
+                                            diarizationRecording = true
                                         } catch (error: Exception) {
                                             diarizationRecording = false
                                             status = error.localizedMessage ?: "Не удалось начать запись."
