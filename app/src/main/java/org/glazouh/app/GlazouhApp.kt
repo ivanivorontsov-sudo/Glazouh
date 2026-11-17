@@ -76,6 +76,7 @@ fun GlazouhApp() {
     var diarizationRecording by remember { mutableStateOf(false) }
     var speakerSegments by remember { mutableStateOf(emptyList<SpeakerSegment>()) }
     var soundMonitoring by remember { mutableStateOf(false) }
+    var soundPreparing by remember { mutableStateOf(false) }
     var soundEvents by remember { mutableStateOf(emptyList<SoundEvent>()) }
 
     val soundMonitor = remember(context) { SoundEventMonitor(context) }
@@ -165,6 +166,8 @@ fun GlazouhApp() {
     }
 
     fun startSoundMonitoring() {
+        if (soundPreparing || soundMonitoring) return
+        soundPreparing = true
         scope.launch {
             try {
                 soundMonitor.start(
@@ -175,6 +178,8 @@ fun GlazouhApp() {
             } catch (error: Exception) {
                 soundMonitoring = false
                 status = error.localizedMessage ?: "Не удалось запустить распознавание звуков."
+            } finally {
+                soundPreparing = false
             }
         }
     }
@@ -409,6 +414,7 @@ fun GlazouhApp() {
                         LargeActionButton("Назад") {
                             soundMonitor.stop()
                             soundMonitoring = false
+                            soundPreparing = false
                             mode = MainMode.HOME
                         }
                         Text(
@@ -419,7 +425,9 @@ fun GlazouhApp() {
                             "При первом запуске скачивается модель около 4 МБ. После загрузки интернет не нужен. Результаты — оценки модели, а не гарантированно верные определения.",
                             fontSize = 15.sp
                         )
-                        if (!soundMonitoring) {
+                        if (soundPreparing) {
+                            Text("Подготавливаю модель и микрофон…", fontSize = 18.sp)
+                        } else if (!soundMonitoring) {
                             LargeActionButton("Начать распознавание звуков") {
                                 val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                                 if (granted) startSoundMonitoring()
