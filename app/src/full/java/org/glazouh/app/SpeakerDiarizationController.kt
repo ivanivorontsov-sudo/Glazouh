@@ -40,6 +40,7 @@ class SpeakerDiarizationController(context: Context) {
     private var samples = ShortArray(INITIAL_SAMPLES)
     private var sampleCount = 0
     private var truncated = false
+    @Volatile private var recordingFailure: String? = null
 
     suspend fun start(onStatus: (String) -> Unit) = withContext(Dispatchers.IO) {
         check(appContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -53,6 +54,7 @@ class SpeakerDiarizationController(context: Context) {
             sampleCount = 0
             truncated = false
         }
+        recordingFailure = null
         val minBuffer = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
@@ -85,7 +87,8 @@ class SpeakerDiarizationController(context: Context) {
                         if (count < 0) throw IOException("Ошибка чтения микрофона: $count")
                         appendSamples(buffer, count)
                     }
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    recordingFailure = error.localizedMessage ?: "Ошибка записи аудио."
                     running.set(false)
                 } finally {
                     runCatching {
@@ -106,7 +109,7 @@ class SpeakerDiarizationController(context: Context) {
 
     suspend fun stopAndAnalyze(onStatus: (String) -> Unit): List<SpeakerSegment> =
         withContext(Dispatchers.IO) {
-            check(running.get()) { "Сейчас нет активной записи." }
+            check(running.get() || recordingFailure != null) { "Сейчас нет активной записи." }
             running.set(false)
             recorder?.let { active ->
                 runCatching {
@@ -115,6 +118,7 @@ class SpeakerDiarizationController(context: Context) {
             }
             worker?.join(5_000)
             check(worker?.isAlive != true) { "Запись ещё останавливается. Попробуйте снова через секунду." }
+            recordingFailure?.let { throw IOException(it) }
             val captured: ShortArray
             val wasTruncated: Boolean
             synchronized(samplesLock) {
@@ -124,47 +128,51 @@ class SpeakerDiarizationController(context: Context) {
                 samples.fill(0)
                 samples = ShortArray(INITIAL_SAMPLES)
             }
-            check(captured.size >= SAMPLE_RATE * MIN_SECONDS) {
-                "Запись слишком короткая. Нужно хотя бы $MIN_SECONDS секунд."
+            if (captured.size < SAMPLE_RATE * MIN_SECONDS) {
+                captured.fill(0)
+                throw IOException("Запись слишком короткая. Нужно хотя бы $MIN_SECONDS секунд.")
             }
             onStatus("Анализирую голоса на устройстве…")
             val floatSamples = FloatArray(captured.size) { captured[it].toFloat() / 32768f }
-            val models = ensureModels(onStatus)
-            val diarizer = OfflineSpeakerDiarization(
-                config = OfflineSpeakerDiarizationConfig(
-                    segmentation = OfflineSpeakerSegmentationModelConfig(
-                        pyannote = OfflineSpeakerSegmentationPyannoteModelConfig(
-                            model = models.first.absolutePath,
-                            windowShiftRatio = 0.1f
-                        ),
-                        numThreads = 2,
-                        provider = "cpu"
-                    ),
-                    embedding = SpeakerEmbeddingExtractorConfig(
-                        model = models.second.absolutePath,
-                        numThreads = 2,
-                        provider = "cpu"
-                    ),
-                    clustering = FastClusteringConfig(numClusters = -1, threshold = 0.5f),
-                    minDurationOn = 0.3f,
-                    minDurationOff = 0.5f
-                )
-            )
             try {
-                check(diarizer.sampleRate() == SAMPLE_RATE) {
-                    "Модель ожидает " + diarizer.sampleRate() + " Гц, запись выполнена с частотой " + SAMPLE_RATE + " Гц."
-                }
-                val result = diarizer.process(floatSamples)
-                val segments = result.map {
-                    SpeakerSegment(it.start, it.end, it.speaker)
-                }.filter { it.endSeconds > it.startSeconds }
-                onStatus(
-                    if (wasTruncated) "Анализ завершён. Обработаны первые 3 минуты записи."
-                    else "Анализ завершён. Найдено голосовых фрагментов: " + segments.size + "."
+                val models = ensureModels(onStatus)
+                val diarizer = OfflineSpeakerDiarization(
+                    config = OfflineSpeakerDiarizationConfig(
+                        segmentation = OfflineSpeakerSegmentationModelConfig(
+                            pyannote = OfflineSpeakerSegmentationPyannoteModelConfig(
+                                model = models.first.absolutePath,
+                                windowShiftRatio = 0.1f
+                            ),
+                            numThreads = 2,
+                            provider = "cpu"
+                        ),
+                        embedding = SpeakerEmbeddingExtractorConfig(
+                            model = models.second.absolutePath,
+                            numThreads = 2,
+                            provider = "cpu"
+                        ),
+                        clustering = FastClusteringConfig(numClusters = -1, threshold = 0.5f),
+                        minDurationOn = 0.3f,
+                        minDurationOff = 0.5f
+                    )
                 )
-                segments
+                try {
+                    check(diarizer.sampleRate() == SAMPLE_RATE) {
+                        "Модель ожидает " + diarizer.sampleRate() + " Гц, запись выполнена с частотой " + SAMPLE_RATE + " Гц."
+                    }
+                    val result = diarizer.process(floatSamples)
+                    val segments = result.map {
+                        SpeakerSegment(it.start, it.end, it.speaker)
+                    }.filter { it.endSeconds > it.startSeconds }
+                    onStatus(
+                        if (wasTruncated) "Анализ завершён. Обработаны первые 3 минуты записи."
+                        else "Анализ завершён. Найдено голосовых фрагментов: " + segments.size + "."
+                    )
+                    segments
+                } finally {
+                    diarizer.release()
+                }
             } finally {
-                diarizer.release()
                 captured.fill(0)
                 floatSamples.fill(0f)
             }
