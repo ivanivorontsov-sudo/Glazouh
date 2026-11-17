@@ -72,7 +72,7 @@
 - Модели [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast).
 - Android TextToSpeech.
 - Android on-device SpeechRecognizer.
-- Два варианта сборки: Lite (без sherpa-onnx runtime) и Full (русский T-one ASR и офлайн-разделение собеседников).
+- Два варианта сборки: Lite (без дополнительных AI runtime) и Full (русский T-one ASR, офлайн-разделение собеседников и распознавание окружающих звуков).
 - GitHub Actions для сборки APK.
 
 Для офлайн-разделения собеседников Full использует Kotlin API [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), pyannote segmentation и 3D-Speaker embeddings. Модели загружаются по запросу, проверяются по размеру и SHA-256, а анализ выполняется локально. Это экспериментальная диаризация голосовых фрагментов, не идентификация людей.
